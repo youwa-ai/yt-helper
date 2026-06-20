@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>yt-helper · 다운로드 목록 생성기</title>
+<meta name="description" content="yt-dlp 다운로드 목록·명령어를 만들어주는 단일 페이지 도구">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #f5f1ea;
+    --paper: #faf7f0;
+    --ink: #1c1c1c;
+    --ink-soft: #4a4a4a;
+    --muted: #8b8680;
+    --line: #d4cfc4;
+    --accent: #c2410c;
+    --accent-soft: #fef3e8;
+    --code-bg: #0d1117;
+    --code-fg: #c9d1d9;
+    --code-prompt: #7ee787;
+    --code-comment: #8b949e;
+    --code-highlight: #ffa657;
+    --code-string: #a5d6ff;
+    --field-bg: #fffdf9;
+    --danger: #b91c1c;
+  }
+
+  /* 다크모드: data-theme="dark" 일 때 변수 덮어쓰기 */
+  html[data-theme="dark"] {
+    --bg: #16130f;
+    --paper: #1f1b16;
+    --ink: #ece6db;
+    --ink-soft: #c3bcae;
+    --muted: #8b8680;
+    --line: #3a342b;
+    --accent: #f97316;
+    --accent-soft: #2a1c10;
+    --field-bg: #26211b;
+  }
+
+  body {
+    font-family: 'Noto Sans KR', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.7;
+    font-size: 16px;
+    padding: 40px 20px 80px;
+    min-height: 100vh;
+    transition: background .2s, color .2s;
+  }
+
+  .container {
+    max-width: 820px;
+    margin: 0 auto;
+    background: var(--paper);
+    padding: 48px 48px 56px;
+    border: 1px solid var(--line);
+    box-shadow: 8px 8px 0 var(--line);
+  }
+
+  /* ===== HEADER ===== */
+  .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 16px;
+  }
+  .meta-btns { display: flex; gap: 8px; }
+
+  .theme-toggle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  h1 {
+    font-size: 40px;
+    font-weight: 900;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin-bottom: 14px;
+  }
+  h1 .accent { color: var(--accent); }
+
+  .subtitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-bottom: 40px;
+    padding-left: 16px;
+    border-left: 3px solid var(--accent);
+  }
+
+  /* ===== TABS ===== */
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--line);
+  }
+  .tab {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 12px 20px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px;
+    transition: all .15s;
+  }
+  .tab:hover { color: var(--ink-soft); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ===== 상단 흐름 안내 (① → ② → ③) ===== */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 10px 14px;
+    flex-wrap: wrap;
+    background: var(--accent-soft);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 40px;
+  }
+  .flow-step {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-soft);
+  }
+  .flow-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .flow-arrow { color: var(--accent); font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+  /* ===== 단계 헤더 (STEP 뱃지) ===== */
+  .step-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin: 44px 0 20px;
+  }
+  .step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px; font-weight: 700;
+    flex-shrink: 0;
+    box-shadow: 2px 2px 0 var(--line);
+  }
+  .step-title { font-size: 18px; font-weight: 700; line-height: 1.35; }
+  .step-desc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  @media (max-width: 600px) {
+    .flow { padding: 14px; gap: 8px 10px; }
+    .flow-step { font-size: 13px; }
+    .step-title { font-size: 16px; }
+  }
+
+  /* ===== FORM ===== */
+  .field { margin-bottom: 16px; }
+  .field-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .field-row .field { flex: 1; min-width: 130px; }
+
+  label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+    letter-spacing: 0.03em;
+  }
+  label .hint { color: var(--muted); font-weight: 400; }
+
+  input[type="text"], select {
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--field-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 11px 14px;
+    transition: border-color .15s;
+  }
+  input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  input.invalid { border-color: var(--danger); background: #fef2f2; }
+  html[data-theme="dark"] input.invalid { background: #2a1414; }
+
+  .err-msg {
+    color: var(--danger);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 6px;
+    min-height: 16px;
+  }
+
+  /* ===== BUTTONS ===== */
+  .btn {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 11px 22px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-ghost { background: transparent; color: var(--accent); }
+  .btn-ghost:hover { background: var(--accent-soft); }
+  .btn-small {
+    font-size: 12px; padding: 6px 12px; border-radius: 5px;
+  }
+
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+
+  /* 파일명 + 제목 가져오기 버튼 한 줄 배치 */
+  .name-row { display: flex; gap: 8px; }
+  .name-row input { flex: 1; min-width: 0; }
+  .name-row .btn { flex-shrink: 0; white-space: nowrap; }
+  .btn:disabled { opacity: .55; cursor: progress; }
+
+  /* ===== LIST ===== */
+  .list-empty {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    padding: 32px 16px;
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+  }
+  .list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: var(--field-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .list-item .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 5px;
+    padding: 2px 8px;
+    flex-shrink: 0;
+  }
+  .list-item .body { flex: 1; min-width: 0; }
+  .list-item .name {
+    font-weight: 700;
+    font-size: 15px;
+    word-break: break-all;
+  }
+  .list-item .name .date-ph { color: var(--accent); font-weight: 500; opacity: .85; }
+  .list-item .name .ext { color: var(--muted); font-weight: 400; }
+  .list-item .info {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+    word-break: break-all;
+  }
+  .list-item .info .tag {
+    color: var(--accent);
+  }
+  .del-btn {
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    border-radius: 5px;
+    width: 28px; height: 28px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    transition: all .15s;
+  }
+  .del-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+  .list-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ===== OUTPUT ===== */
+  .output-box {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 20px 22px;
+    border-radius: 6px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 360px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+  }
+  .output-box .c-comment { color: var(--code-comment); }
+  .output-box .c-prompt { color: var(--code-prompt); }
+  .output-box .c-highlight { color: var(--code-highlight); }
+  .output-box .c-string { color: var(--code-string); }
+
+  /* ===== TOAST ===== */
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 12px 24px;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: all .25s;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ===== GUIDE ===== */
+  details.guide {
+    margin-top: 48px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 4px 20px;
+    background: var(--field-bg);
+  }
+  details.guide summary {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    cursor: pointer;
+    padding: 14px 0;
+    list-style: none;
+  }
+  details.guide summary::-webkit-details-marker { display: none; }
+  details.guide summary::before { content: "▸ "; color: var(--accent); }
+  details.guide[open] summary::before { content: "▾ "; }
+  details.guide .guide-body {
+    padding: 4px 0 18px;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  details.guide code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  details.guide ol { padding-left: 20px; margin: 8px 0; }
+  details.guide li { margin-bottom: 6px; }
+
+  .footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 600px) {
+    body { padding: 20px 12px 60px; }
+    .container { padding: 28px 20px 36px; box-shadow: 5px 5px 0 var(--line); }
+    h1 { font-size: 30px; }
+    .field-row { gap: 10px; }
+    .tab { padding: 10px 14px; font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="meta">
+    <span>YT-HELPER · LIST GENERATOR</span>
+    <span class="meta-btns">
+      <button class="theme-toggle" id="langToggle">🌐 English</button>
+      <button class="theme-toggle" id="themeToggle">🌙 다크</button>
+    </span>
+  </div>
+
+  <h1 data-i18n-html="h1">다운로드 <span class="accent">목록</span> 생성기</h1>
+  <p class="subtitle" data-i18n="subtitle"># yt-dlp 목록 파일과 명령어를 만들어드려요 · 서버 없이 브라우저에서 동작</p>
+
+  <!-- 처음 오신 분을 위한 단계 흐름 -->
+  <div class="flow">
+    <span class="flow-step"><span class="flow-num">1</span> <span data-i18n="flow1">정보 입력</span></span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step"><span class="flow-num">2</span> <span data-i18n="flow2">목록에 담기</span></span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step"><span class="flow-num">3</span> <span data-i18n="flow3">목록 저장</span></span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step"><span class="flow-num">4</span> <span data-i18n="flow4">폴더생성·다운로드</span></span>
+  </div>
+
+  <!-- 탭 -->
+  <div class="tabs">
+    <button class="tab active" data-tab="video" data-i18n="tab_video">🎬 영상</button>
+    <button class="tab" data-tab="audio" data-i18n="tab_audio">🎵 오디오</button>
+  </div>
+
+  <!-- ===================== 영상 탭 ===================== -->
+  <section id="tab-video">
+    <div class="step-head">
+      <span class="step-badge">1</span>
+      <div>
+        <div class="step-title" data-i18n="v_step1_title">영상 정보 입력하기</div>
+        <div class="step-desc" data-i18n="v_step1_desc">URL 넣기 → 🎯 제목 가져오기 → 옵션 고르기</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label><span data-i18n="lbl_url">URL</span> <span class="hint" data-i18n="hint_url">유튜브 주소</span></label>
+      <input type="text" id="v-url" placeholder="https://youtu.be/...">
+      <div class="err-msg" id="v-url-err"></div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label><span data-i18n="lbl_section">구간</span> <span class="hint" data-i18n="hint_section">시작-끝 (빈칸=전체)</span></label>
+        <input type="text" id="v-section" placeholder="00:30-02:15">
+        <div class="err-msg" id="v-section-err"></div>
+      </div>
+      <div class="field">
+        <label><span data-i18n="lbl_speed">배속</span> <span class="hint" data-i18n="hint_speed">기본 1.0</span></label>
+        <select id="v-speed">
+          <option value="" data-i18n="opt_speed_orig">1.0 (원본)</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="1.75">1.75x</option>
+          <option value="2.0">2.0x</option>
+        </select>
+      </div>
+      <div class="field">
+        <label><span data-i18n="lbl_resolution">해상도</span> <span class="hint" data-i18n="hint_resolution">기본 1080</span></label>
+        <select id="v-resolution">
+          <option value="720">720p</option>
+          <option value="" selected>1080p</option>
+          <option value="1440">1440p</option>
+          <option value="2160">2160p (4K)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label><span data-i18n="lbl_name">파일명</span> <span class="hint" data-i18n="v_hint_name">확장자·날짜 제외 · 비우면 제목 자동</span></label>
+      <div class="name-row">
+        <input type="text" id="v-name" data-i18n-ph="ph_name" placeholder="URL 넣고 → 제목 가져오기">
+        <button class="btn btn-ghost btn-small" id="v-fetch" type="button" data-i18n="btn_fetch">🎯 제목 가져오기</button>
+      </div>
+      <div class="err-msg" id="v-name-err"></div>
+    </div>
+
+    <div class="step-head">
+      <span class="step-badge">2</span>
+      <div>
+        <div class="step-title"><span data-i18n="step2_title">목록에 담기</span> <span class="list-count" id="v-count"></span></div>
+        <div class="step-desc" data-i18n="step2_desc">＋추가를 누르면 아래 목록에 쌓여요 (자동 저장)</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="v-add" data-i18n="btn_add">＋ 목록에 추가</button>
+    <div id="v-list" style="margin-top:16px;"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-small" id="v-clear" data-i18n="btn_clear">🗑 목록 전체 비우기</button>
+    </div>
+
+    <div class="step-head">
+      <span class="step-badge">3</span>
+      <div>
+        <div class="step-title" data-i18n="step3_title">목록 파일 저장 (선택)</div>
+        <div class="step-desc" data-i18n="v_step3_desc">다운목록.txt를 "영상 받을 폴더"에 저장 — 그 폴더가 작업 폴더가 돼요 (백업용, 건너뛰어도 됨)</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-small" id="v-dl-txt" data-i18n="v_btn_dltxt">📄 다운목록.txt 저장</button>
+    </div>
+    <div class="output-box" id="v-preview" style="margin-top:14px;"></div>
+
+    <div class="step-head">
+      <span class="step-badge">4</span>
+      <div>
+        <div class="step-title" data-i18n="step4_title">저장폴더 생성 · 명령어 복사</div>
+        <div class="step-desc" data-i18n="v_step4_desc">작업 폴더에서 PowerShell 열고 붙여넣기 → movie 폴더를 만들어 그 안에 저장</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-small" id="v-copy-cmd" data-i18n="btn_copycmd">📋 저장폴더생성/명령어복사</button>
+    </div>
+  </section>
+
+  <!-- ===================== 오디오 탭 ===================== -->
+  <section id="tab-audio" style="display:none;">
+    <div class="step-head">
+      <span class="step-badge">1</span>
+      <div>
+        <div class="step-title" data-i18n="a_step1_title">오디오 정보 입력하기</div>
+        <div class="step-desc" data-i18n="a_step1_desc">URL 넣기 → 🎯 제목 가져오기 → 비트레이트 고르기</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label><span data-i18n="lbl_url">URL</span> <span class="hint" data-i18n="hint_url">유튜브 주소</span></label>
+      <input type="text" id="a-url" placeholder="https://youtu.be/...">
+      <div class="err-msg" id="a-url-err"></div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label><span data-i18n="lbl_section">구간</span> <span class="hint" data-i18n="hint_section">시작-끝 (빈칸=전체)</span></label>
+        <input type="text" id="a-section" placeholder="00:30-02:15">
+        <div class="err-msg" id="a-section-err"></div>
+      </div>
+      <div class="field">
+        <label><span data-i18n="lbl_bitrate">비트레이트</span> <span class="hint" data-i18n="hint_bitrate">기본 192k</span></label>
+        <select id="a-bitrate">
+          <option value="64" data-i18n="opt_br_64">64k (저용량 음성)</option>
+          <option value="96">96k</option>
+          <option value="128" data-i18n="opt_br_128">128k (강의·팟캐스트)</option>
+          <option value="" selected data-i18n="opt_br_192">192k (음악 기본)</option>
+          <option value="256">256k</option>
+          <option value="320" data-i18n="opt_br_320">320k (고음질)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label><span data-i18n="lbl_name">파일명</span> <span class="hint" data-i18n="a_hint_name">비트레이트·날짜 제외 · 비우면 제목 자동</span></label>
+      <div class="name-row">
+        <input type="text" id="a-name" data-i18n-ph="ph_name" placeholder="URL 넣고 → 제목 가져오기">
+        <button class="btn btn-ghost btn-small" id="a-fetch" type="button" data-i18n="btn_fetch">🎯 제목 가져오기</button>
+      </div>
+      <div class="err-msg" id="a-name-err"></div>
+    </div>
+
+    <div class="step-head">
+      <span class="step-badge">2</span>
+      <div>
+        <div class="step-title"><span data-i18n="step2_title">목록에 담기</span> <span class="list-count" id="a-count"></span></div>
+        <div class="step-desc" data-i18n="step2_desc">＋추가를 누르면 아래 목록에 쌓여요 (자동 저장)</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="a-add" data-i18n="btn_add">＋ 목록에 추가</button>
+    <div id="a-list" style="margin-top:16px;"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-small" id="a-clear" data-i18n="btn_clear">🗑 목록 전체 비우기</button>
+    </div>
+
+    <div class="step-head">
+      <span class="step-badge">3</span>
+      <div>
+        <div class="step-title" data-i18n="step3_title">목록 파일 저장 (선택)</div>
+        <div class="step-desc" data-i18n="a_step3_desc">오디오목록.txt를 "오디오 받을 폴더"에 저장 — 그 폴더가 작업 폴더가 돼요 (백업용, 건너뛰어도 됨)</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-small" id="a-dl-txt" data-i18n="a_btn_dltxt">📄 오디오목록.txt 저장</button>
+    </div>
+    <div class="output-box" id="a-preview" style="margin-top:14px;"></div>
+
+    <div class="step-head">
+      <span class="step-badge">4</span>
+      <div>
+        <div class="step-title" data-i18n="step4_title">저장폴더 생성 · 명령어 복사</div>
+        <div class="step-desc" data-i18n="a_step4_desc">작업 폴더에서 PowerShell 열고 붙여넣기 → audio 폴더를 만들어 그 안에 저장</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-small" id="a-copy-cmd" data-i18n="btn_copycmd">📋 저장폴더생성/명령어복사</button>
+    </div>
+  </section>
+
+  <!-- ===================== 사용 가이드 ===================== -->
+  <details class="guide" open>
+    <summary data-i18n="guide_summary">📖 사용법 — 순서대로 따라하기</summary>
+    <div class="guide-body">
+      <div data-i18n-html="guide_howto"></div>
+
+      <hr style="border:none; border-top:1px solid var(--line); margin:22px 0;">
+
+      <p data-i18n-html="guide_install_head"></p>
+      <div class="output-box" id="install-prompt" data-i18n="install_prompt"></div>
+      <button class="btn btn-ghost btn-small" id="copy-install" type="button" data-i18n="btn_copy_install">📋 설치 프롬프트 복사</button>
+    </div>
+  </details>
+
+  <div class="footer" data-i18n-html="footer"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   yt-helper — 목록/명령어 생성기
+   데이터는 localStorage 키에 저장:
+     ythelper_video / ythelper_audio / ythelper_theme / ythelper_lang
+========================================================= */
+
+// ----- 작은 헬퍼 -----
+const $ = (id) => document.getElementById(id);
+
+/* =========================================================
+   다국어 사전 (KO / EN)
+   - 화면 텍스트는 data-i18n / data-i18n-html / data-i18n-ph 로 표시
+   - JS가 만드는 문자열은 t('키') 로 가져옴
+========================================================= */
+const I18N = {
+  ko: {
+    h1: '유튜브 <span class="accent">다운로드</span> 도우미',
+    subtitle: '# yt-dlp 목록 파일과 명령어를 만들어드려요 · 서버 없이 브라우저에서 동작',
+    flow1: '정보 입력', flow2: '목록에 담기', flow3: '목록 저장', flow4: '폴더생성·다운로드',
+    tab_video: '🎬 영상', tab_audio: '🎵 오디오',
+    v_step1_title: '영상 정보 입력하기', v_step1_desc: 'URL 넣기 → 🎯 제목 가져오기 → 옵션 고르기',
+    a_step1_title: '오디오 정보 입력하기', a_step1_desc: 'URL 넣기 → 🎯 제목 가져오기 → 비트레이트 고르기',
+    step2_title: '다운 받을 목록 리스트 만들기', step2_desc: '＋추가를 누르면 아래 목록에 쌓여요 (자동 저장)',
+    step3_title: '목록 파일 저장 (선택)',
+    v_step3_desc: '다운목록.txt를 "영상 받을 폴더"에 저장 — 그 폴더가 작업 폴더가 돼요 (백업용, 건너뛰어도 됨)',
+    a_step3_desc: '오디오목록.txt를 "오디오 받을 폴더"에 저장 — 그 폴더가 작업 폴더가 돼요 (백업용, 건너뛰어도 됨)',
+    step4_title: '저장폴더 생성 · 명령어 복사',
+    v_step4_desc: '작업 폴더에서 PowerShell 열고 붙여넣기 → movie 폴더를 만들어 그 안에 저장',
+    a_step4_desc: '작업 폴더에서 PowerShell 열고 붙여넣기 → audio 폴더를 만들어 그 안에 저장',
+    lbl_url: 'URL', hint_url: '유튜브 주소',
+    lbl_section: '구간', hint_section: '시작-끝 (빈칸=전체)',
+    lbl_speed: '배속', hint_speed: '기본 1.0', opt_speed_orig: '1.0 (원본)',
+    lbl_resolution: '해상도', hint_resolution: '기본 1080',
+    lbl_bitrate: '비트레이트', hint_bitrate: '기본 192k',
+    opt_br_64: '64k (저용량 음성)', opt_br_128: '128k (강의·팟캐스트)', opt_br_192: '192k (음악 기본)', opt_br_320: '320k (고음질)',
+    lbl_name: '파일명', v_hint_name: '확장자·날짜 제외 · 비우면 제목 자동', a_hint_name: '비트레이트·날짜 제외 · 비우면 제목 자동',
+    ph_name: 'URL 넣고 → 제목 가져오기',
+    btn_fetch: '🎯 제목 가져오기', btn_add: '＋ 목록에 추가', btn_clear: '🗑 목록 전체 비우기',
+    v_btn_dltxt: '📄 다운목록.txt 저장', a_btn_dltxt: '📄 오디오목록.txt 저장',
+    btn_copycmd: '📋 저장폴더생성/명령어복사',
+    guide_summary: '📖 사용법 — 순서대로 따라하기',
+    guide_howto:
+`<p style="color:var(--accent); font-weight:700; margin-bottom:14px;">❗ 처음이라면 <strong>필수 설치파일 설치하기 안내</strong>를 먼저 참고하세요 (하단)</p>
+<p><strong>STEP 1·2 — 목록 만들기</strong><br>
+URL을 넣고 <code>🎯 제목 가져오기</code>로 파일명을 채워요. 옵션(해상도·배속·비트레이트)을 고른 뒤 <code>＋ 추가</code>를 누르면 아래 목록에 쌓여요. 받고 싶은 만큼 반복하세요. (브라우저가 자동 저장 → 닫아도 유지)</p>
+<p style="margin-top:14px;"><strong>STEP 3 — 목록 파일 저장 <span style="color:var(--muted);">(선택)</span></strong><br>
+<code>📄 다운목록.txt 저장</code>을 누르면 저장 창이 떠요. <strong>영상을 받고 싶은 폴더</strong>를 골라 저장하세요. 이 폴더가 "작업 폴더"가 됩니다. (목록 백업용이라 건너뛰어도 돼요)</p>
+<p style="margin-top:14px;"><strong>STEP 4 — 저장폴더 생성 · 명령어 복사</strong></p>
+<ol>
+  <li>작업 폴더(STEP 3에서 저장한 폴더)를 파일 탐색기로 열어요.</li>
+  <li>폴더 빈 곳에서 <code>Shift + 마우스 우클릭</code> → <code>여기에 PowerShell 창 열기</code> 클릭.</li>
+  <li>이 도구에서 <code>📋 저장폴더생성/명령어복사</code>를 누르고, PowerShell 창에서 <code>마우스 우클릭</code> 또는 <code>Ctrl+V</code>로 붙여넣은 뒤 <code>Enter</code>.</li>
+  <li>그 폴더 안에 <code>movie</code>(영상) · <code>audio</code>(오디오) 폴더가 생기고, 파일이 그 안에 저장돼요. 파일명 끝엔 <strong>업로드 날짜</strong>가 자동으로 붙어요.</li>
+</ol>
+<p style="margin-top:8px; color:var(--muted); font-size:13px;">※ 구간은 <code>00:30-02:15</code> 또는 <code>90-150</code>(초). 파일명의 금지문자·이모지는 자동으로 정리돼요.</p>`,
+    guide_install_head:
+`<strong>🔧 처음이라면 — yt-dlp · ffmpeg 설치하기</strong><br>
+아직 yt-dlp·ffmpeg가 없다면, 아래 프롬프트를 복사해서 <strong>클로드(claude.ai 또는 Claude Code)</strong>에 붙여넣으세요. 클로드가 설치를 단계별로 도와줘요.`,
+    install_prompt:
+`윈도우 11에서 유튜브 영상·오디오를 다운로드할 환경을 만들고 싶어.
+yt-dlp와 ffmpeg를 winget으로 설치해줘. PowerShell 7이 없으면 그것도 같이 설치해줘.
+설치가 끝나면 yt-dlp --version 과 ffmpeg -version 으로 잘 설치됐는지 확인하는 방법을 알려줘.
+설치 중에 권한이나 실행 정책(ExecutionPolicy) 문제가 생기면 해결 방법도 함께 알려줘.`,
+    btn_copy_install: '📋 설치 프롬프트 복사',
+    footer: 'yt-helper v1.0 · made by JEJE · <a href="https://www.threads.net/@youwa0v0" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">@youwa0v0</a>',
+    // ---- JS 동적 문자열 ----
+    toast_added_video: '영상 목록에 추가했어요', toast_added_audio: '오디오 목록에 추가했어요',
+    toast_empty: '목록이 비어 있어요',
+    toast_saved_v: '다운목록.txt 저장됨', toast_saved_a: '오디오목록.txt 저장됨',
+    toast_cleared_v: '영상 목록을 비웠어요', toast_cleared_a: '오디오 목록을 비웠어요',
+    toast_got_title: '제목을 가져왔어요',
+    lbl_cmd: 'yt-dlp 명령어', lbl_install: '설치 프롬프트', copied: '복사 완료',
+    err_url: 'http(s):// 로 시작하는 URL을 넣어주세요',
+    err_name_req: '파일명을 입력해주세요',
+    err_name_bad: '파일명에 \\ / : * ? " < > | 는 못 써요',
+    err_section: '구간 형식: 00:30-02:15 또는 90-150',
+    err_url_first: '먼저 위에 URL을 넣어주세요',
+    err_title_fail: '제목을 못 가져왔어요 (인터넷·CORS 확인, 직접 입력 가능)',
+    fetching: '가져오는 중…',
+    empty_list: '# 아직 비어 있어요 — 위 STEP 1에서 정보를 넣고 ＋추가를 눌러보세요.',
+    preview_empty: '# 목록을 추가하면 여기에서 미리볼 수 있어요.',
+    count_unit: '개', sec_label: '구간', sec_full: '전체', date_ph: '[업로드날짜]',
+    confirm_clear_v: '영상 목록을 전부 비울까요?', confirm_clear_a: '오디오 목록을 전부 비울까요?',
+    theme_to_light: '☀️ 라이트', theme_to_dark: '🌙 다크',
+    cmd_sec: ', 구간 ', cmd_empty: '# 목록이 비어 있어요.',
+    txt_header_video:
+`# 다운로드 목록
+# 형식: URL | 시작-끝 | 배속 | 해상도 | 파일명
+# 해상도 옵션: 720, 1080(기본), 1440, 2160
+# 빈 칸 = 기본값 적용
+# 배속 1.0 = 원본 속도, 1.25, 1.5 등 가능
+# #으로 시작하는 줄은 무시됨
+`,
+    txt_header_audio:
+`# 형식: URL | 시작-끝 | 비트레이트 | 파일명
+# 비트레이트 옵션: 320, 256, 192(기본), 128, 96, 64
+# 구간 빈 칸 = 전체 다운로드
+# #으로 시작하는 줄은 메모용 (무시됨)
+`
+  },
+
+  en: {
+    h1: 'YouTube <span class="accent">Download</span> Helper',
+    subtitle: '# Build yt-dlp list files and commands · runs in your browser, no server',
+    flow1: 'Enter info', flow2: 'Add to list', flow3: 'Save list', flow4: 'Create folder · Download',
+    tab_video: '🎬 Video', tab_audio: '🎵 Audio',
+    v_step1_title: 'Enter video info', v_step1_desc: 'Paste URL → 🎯 Get title → pick options',
+    a_step1_title: 'Enter audio info', a_step1_desc: 'Paste URL → 🎯 Get title → pick bitrate',
+    step2_title: 'Build your download list', step2_desc: 'Press ＋Add to stack items below (auto-saved)',
+    step3_title: 'Save list file (optional)',
+    v_step3_desc: 'Save 다운목록.txt into the folder you want videos in — that becomes the working folder (backup, can skip)',
+    a_step3_desc: 'Save 오디오목록.txt into the folder you want audio in — that becomes the working folder (backup, can skip)',
+    step4_title: 'Create folder · Copy command',
+    v_step4_desc: 'Open PowerShell in that folder and paste → creates a "movie" folder and saves there',
+    a_step4_desc: 'Open PowerShell in that folder and paste → creates an "audio" folder and saves there',
+    lbl_url: 'URL', hint_url: 'YouTube link',
+    lbl_section: 'Section', hint_section: 'start-end (blank=full)',
+    lbl_speed: 'Speed', hint_speed: 'default 1.0', opt_speed_orig: '1.0 (original)',
+    lbl_resolution: 'Resolution', hint_resolution: 'default 1080',
+    lbl_bitrate: 'Bitrate', hint_bitrate: 'default 192k',
+    opt_br_64: '64k (low-size voice)', opt_br_128: '128k (lecture·podcast)', opt_br_192: '192k (music default)', opt_br_320: '320k (high quality)',
+    lbl_name: 'Filename', v_hint_name: 'no ext/date · blank = auto title', a_hint_name: 'no bitrate/date · blank = auto title',
+    ph_name: 'Paste URL → Get title',
+    btn_fetch: '🎯 Get title', btn_add: '＋ Add to list', btn_clear: '🗑 Clear all',
+    v_btn_dltxt: '📄 Save 다운목록.txt', a_btn_dltxt: '📄 Save 오디오목록.txt',
+    btn_copycmd: '📋 Create folder & copy command',
+    guide_summary: '📖 How to use — step by step',
+    guide_howto:
+`<p style="color:var(--accent); font-weight:700; margin-bottom:14px;">❗ First time? See the <strong>required-install guide</strong> first (below)</p>
+<p><strong>STEP 1·2 — Build your list</strong><br>
+Paste a URL and fill the filename with <code>🎯 Get title</code>. Pick options (resolution/speed/bitrate), then press <code>＋ Add</code> to stack items below. Repeat as many as you like. (auto-saved in your browser → kept after closing)</p>
+<p style="margin-top:14px;"><strong>STEP 3 — Save list file <span style="color:var(--muted);">(optional)</span></strong><br>
+Press <code>📄 Save 다운목록.txt</code> and a save dialog opens. Choose <strong>the folder you want videos in</strong>. That folder becomes your "working folder". (it's a backup, so you can skip it)</p>
+<p style="margin-top:14px;"><strong>STEP 4 — Create folder · Copy command</strong></p>
+<ol>
+  <li>Open the working folder (the one from STEP 3) in File Explorer.</li>
+  <li>In an empty area, <code>Shift + right-click</code> → <code>Open PowerShell window here</code>.</li>
+  <li>Press <code>📋 Create folder & copy command</code> here, then paste into PowerShell with <code>right-click</code> or <code>Ctrl+V</code> and hit <code>Enter</code>.</li>
+  <li>A <code>movie</code> (video) · <code>audio</code> folder is created and files are saved inside. The <strong>upload date</strong> is appended to each filename automatically.</li>
+</ol>
+<p style="margin-top:8px; color:var(--muted); font-size:13px;">※ Section is <code>00:30-02:15</code> or <code>90-150</code> (sec). Forbidden characters and emojis in filenames are cleaned automatically.</p>`,
+    guide_install_head:
+`<strong>🔧 First time? — Install yt-dlp · ffmpeg</strong><br>
+If you don't have yt-dlp·ffmpeg yet, copy the prompt below and paste it into <strong>Claude (claude.ai or Claude Code)</strong>. Claude will walk you through the install.`,
+    install_prompt:
+`I want to set up my Windows 11 PC to download YouTube videos and audio.
+Please install yt-dlp and ffmpeg with winget. If PowerShell 7 is missing, install that too.
+After installing, show me how to verify with yt-dlp --version and ffmpeg -version.
+If any permission or ExecutionPolicy issues come up during install, help me fix them.`,
+    btn_copy_install: '📋 Copy install prompt',
+    footer: 'yt-helper v1.0 · made by JEJE · <a href="https://www.threads.net/@youwa0v0" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">@youwa0v0</a>',
+    // ---- JS dynamic strings ----
+    toast_added_video: 'Added to video list', toast_added_audio: 'Added to audio list',
+    toast_empty: 'List is empty',
+    toast_saved_v: '다운목록.txt saved', toast_saved_a: '오디오목록.txt saved',
+    toast_cleared_v: 'Video list cleared', toast_cleared_a: 'Audio list cleared',
+    toast_got_title: 'Got the title',
+    lbl_cmd: 'yt-dlp command', lbl_install: 'Install prompt', copied: 'copied',
+    err_url: 'Enter a URL starting with http(s)://',
+    err_name_req: 'Please enter a filename',
+    err_name_bad: 'Filename can\'t contain \\ / : * ? " < > |',
+    err_section: 'Section format: 00:30-02:15 or 90-150',
+    err_url_first: 'Enter a URL above first',
+    err_title_fail: "Couldn't get the title (check internet/CORS; type it manually)",
+    fetching: 'Getting…',
+    empty_list: '# Empty — enter info in STEP 1 above and press ＋Add.',
+    preview_empty: '# Add items and preview them here.',
+    count_unit: '', sec_label: 'sec', sec_full: 'full', date_ph: '[upload-date]',
+    confirm_clear_v: 'Clear the entire video list?', confirm_clear_a: 'Clear the entire audio list?',
+    theme_to_light: '☀️ Light', theme_to_dark: '🌙 Dark',
+    cmd_sec: ', sec ', cmd_empty: '# The list is empty.',
+    txt_header_video:
+`# Download list
+# Format: URL | start-end | speed | resolution | filename
+# Resolution options: 720, 1080(default), 1440, 2160
+# Blank = default applied
+# Speed 1.0 = original; 1.25, 1.5, etc. allowed
+# Lines starting with # are ignored
+`,
+    txt_header_audio:
+`# Format: URL | start-end | bitrate | filename
+# Bitrate options: 320, 256, 192(default), 128, 96, 64
+# Blank section = full download
+# Lines starting with # are memos (ignored)
+`
+  }
+};
+
+let LANG = (localStorage.getItem('ythelper_lang') === 'en') ? 'en' : 'ko';
+function t(key) {
+  return (I18N[LANG] && I18N[LANG][key] != null) ? I18N[LANG][key] : (I18N.ko[key] != null ? I18N.ko[key] : key);
+}
+
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+// 파일명/구간 검증
+const BAD_NAME = /[\\/:*?"<>|]/;            // 윈도우 금지문자
+const SECTION_OK = /^\s*[\d:]+\s*-\s*[\d:]+\s*$/;  // 00:30-02:15 또는 90-150
+
+function looksLikeUrl(s) {
+  return /^https?:\/\/.+/.test(s.trim());
+}
+
+// HTML 이스케이프 (목록에 사용자 입력 그대로 넣을 때)
+function esc(s) {
+  return s.replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+// ----- 저장/불러오기 -----
+function load(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || []; }
+  catch { return []; }
+}
+function save(key, arr) {
+  localStorage.setItem(key, JSON.stringify(arr));
+}
+
+let videoList = load('ythelper_video');
+let audioList = load('ythelper_audio');
+
+/* =========================================================
+   탭 전환
+========================================================= */
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    $('tab-video').style.display = (tab === 'video') ? '' : 'none';
+    $('tab-audio').style.display = (tab === 'audio') ? '' : 'none';
+  });
+});
+
+/* =========================================================
+   다크모드 토글 (localStorage 기억)
+========================================================= */
+const themeBtn = $('themeToggle');
+function updateThemeBtn() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  themeBtn.textContent = isDark ? t('theme_to_light') : t('theme_to_dark');
+}
+function applyTheme(theme) {
+  if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  else document.documentElement.removeAttribute('data-theme');
+  updateThemeBtn();
+}
+themeBtn.addEventListener('click', () => {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const next = isDark ? 'light' : 'dark';
+  applyTheme(next);
+  localStorage.setItem('ythelper_theme', next);
+});
+
+/* =========================================================
+   언어 토글 (localStorage 기억)
+========================================================= */
+const langBtn = $('langToggle');
+function applyLang(lang) {
+  LANG = (lang === 'en') ? 'en' : 'ko';
+  localStorage.setItem('ythelper_lang', LANG);
+  document.documentElement.setAttribute('lang', LANG);
+
+  // 정적 텍스트 채우기
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+
+  // 버튼 라벨 (토글 버튼은 누르면 갈 언어를 표시)
+  langBtn.textContent = (LANG === 'ko') ? '🌐 English' : '🌐 한국어';
+  updateThemeBtn();
+
+  // 동적 영역 다시 그리기
+  renderVideo();
+  renderAudio();
+}
+langBtn.addEventListener('click', () => applyLang(LANG === 'ko' ? 'en' : 'ko'));
+
+/* =========================================================
+   영상 탭 로직
+========================================================= */
+function vClearErr() {
+  ['v-url-err','v-section-err','v-name-err'].forEach(id => $(id).textContent = '');
+  ['v-url','v-section','v-name'].forEach(id => $(id).classList.remove('invalid'));
+}
+
+async function vAdd() {
+  vClearErr();
+  const url = $('v-url').value.trim();
+  const section = $('v-section').value.trim();
+  const speed = $('v-speed').value;          // '' = 1.0
+  const resolution = $('v-resolution').value; // '' = 1080
+
+  // 파일명 비었고 URL이 정상이면 → 제목 자동 채우기
+  if (!$('v-name').value.trim() && looksLikeUrl(url)) {
+    const title = await fetchTitle(url);
+    if (title) $('v-name').value = sanitizeName(title);
+  }
+  const name = $('v-name').value.trim();
+
+  let ok = true;
+  if (!looksLikeUrl(url)) {
+    $('v-url-err').textContent = t('err_url');
+    $('v-url').classList.add('invalid'); ok = false;
+  }
+  if (!name) {
+    $('v-name-err').textContent = t('err_name_req');
+    $('v-name').classList.add('invalid'); ok = false;
+  } else if (BAD_NAME.test(name)) {
+    $('v-name-err').textContent = t('err_name_bad');
+    $('v-name').classList.add('invalid'); ok = false;
+  }
+  if (section && !SECTION_OK.test(section)) {
+    $('v-section-err').textContent = t('err_section');
+    $('v-section').classList.add('invalid'); ok = false;
+  }
+  if (!ok) return;
+
+  videoList.push({ url, section, speed, resolution, name });
+  save('ythelper_video', videoList);
+  $('v-url').value = ''; $('v-section').value = ''; $('v-name').value = '';
+  renderVideo();
+  toast(t('toast_added_video'));
+}
+
+function vDelete(i) {
+  videoList.splice(i, 1);
+  save('ythelper_video', videoList);
+  renderVideo();
+}
+
+function renderVideo() {
+  const wrap = $('v-list');
+  $('v-count').textContent = videoList.length ? `(${videoList.length}${t('count_unit')})` : '';
+  if (!videoList.length) {
+    wrap.innerHTML = `<div class="list-empty">${t('empty_list')}</div>`;
+  } else {
+    wrap.innerHTML = videoList.map((it, i) => {
+      const res = it.resolution || '1080';
+      const spd = it.speed || '1.0';
+      const sec = it.section ? `${t('sec_label')} ${esc(it.section)}` : t('sec_full');
+      return `<div class="list-item">
+        <span class="num">${i+1}</span>
+        <div class="body">
+          <div class="name">${esc(it.name)}<span class="date-ph">_${t('date_ph')}</span><span class="ext">.mp4</span></div>
+          <div class="info"><span class="tag">${res}p · ${spd}x</span> · ${sec}<br>${esc(it.url)}</div>
+        </div>
+        <button class="del-btn" data-v-del="${i}" title="×">×</button>
+      </div>`;
+    }).join('');
+  }
+  renderVideoPreview();
+}
+
+// 다운목록.txt 본문 생성 (스크립트가 읽는 형식: URL | 구간 | 배속 | 해상도 | 파일명)
+function videoTxt() {
+  const lines = videoList.map(it =>
+    `${it.url} | ${it.section} | ${it.speed} | ${it.resolution} | ${it.name}`
+  );
+  return t('txt_header_video') + '\n' + lines.join('\n') + '\n';
+}
+
+// yt-dlp 명령어 생성 (파일명에 업로드 날짜 = yt-dlp %(upload_date)s)
+function videoCmd() {
+  if (!videoList.length) return t('cmd_empty');
+  // 현재 폴더 안에 movie·audio 폴더 생성 → 영상은 movie 폴더에 저장
+  const out = ['New-Item -ItemType Directory -Force movie, audio | Out-Null', ''];
+  videoList.forEach((it, i) => {
+    const res = it.resolution || '1080';
+    const spd = it.speed || '1.0';
+    const fmt = `bv*[height<=${res}]+ba[ext=m4a]/bv*[height<=${res}]+ba`;
+    let base = `yt-dlp -f "${fmt}" --merge-output-format mp4`;
+    if (it.section) base += ` --download-sections "*${it.section}"`;
+
+    out.push(`# [${i+1}] ${it.name}  (${res}p, ${spd}x${it.section ? t('cmd_sec')+it.section : ''})`);
+    if (spd === '1.0') {
+      out.push(`${base} -o "movie\\${it.name}_%(upload_date)s.mp4" "${it.url}"`);
+    } else {
+      // 배속: ffmpeg 결과 파일명엔 템플릿이 안 먹으므로 업로드 날짜를 먼저 받아 변수에 저장
+      out.push(`$d = yt-dlp --print upload_date "${it.url}"`);
+      out.push(`${base} -o "movie\\_temp_${it.name}.mp4" "${it.url}"`);
+      out.push(`ffmpeg -y -i "movie\\_temp_${it.name}.mp4" -filter_complex "[0:v]setpts=PTS/${spd}[v];[0:a]atempo=${spd}[a]" -map "[v]" -map "[a]" "movie\\${it.name}_$($d).mp4"`);
+      out.push(`Remove-Item "movie\\_temp_${it.name}.mp4"`);
+    }
+    out.push('');
+  });
+  return out.join('\n').trim();
+}
+
+// 미리보기(터미널 박스) — txt 형식을 색칠해서 보여줌
+function renderVideoPreview() {
+  const box = $('v-preview');
+  if (!videoList.length) {
+    box.innerHTML = `<span class="c-comment">${esc(t('preview_empty'))}</span>`;
+    return;
+  }
+  box.innerHTML = colorTxt(videoTxt());
+}
+
+/* =========================================================
+   오디오 탭 로직
+========================================================= */
+function aClearErr() {
+  ['a-url-err','a-section-err','a-name-err'].forEach(id => $(id).textContent = '');
+  ['a-url','a-section','a-name'].forEach(id => $(id).classList.remove('invalid'));
+}
+
+async function aAdd() {
+  aClearErr();
+  const url = $('a-url').value.trim();
+  const section = $('a-section').value.trim();
+  const bitrate = $('a-bitrate').value;  // '' = 192
+
+  // 파일명 비었고 URL이 정상이면 → 제목 자동 채우기
+  if (!$('a-name').value.trim() && looksLikeUrl(url)) {
+    const title = await fetchTitle(url);
+    if (title) $('a-name').value = sanitizeName(title);
+  }
+  const name = $('a-name').value.trim();
+
+  let ok = true;
+  if (!looksLikeUrl(url)) {
+    $('a-url-err').textContent = t('err_url');
+    $('a-url').classList.add('invalid'); ok = false;
+  }
+  if (!name) {
+    $('a-name-err').textContent = t('err_name_req');
+    $('a-name').classList.add('invalid'); ok = false;
+  } else if (BAD_NAME.test(name)) {
+    $('a-name-err').textContent = t('err_name_bad');
+    $('a-name').classList.add('invalid'); ok = false;
+  }
+  if (section && !SECTION_OK.test(section)) {
+    $('a-section-err').textContent = t('err_section');
+    $('a-section').classList.add('invalid'); ok = false;
+  }
+  if (!ok) return;
+
+  audioList.push({ url, section, bitrate, name });
+  save('ythelper_audio', audioList);
+  $('a-url').value = ''; $('a-section').value = ''; $('a-name').value = '';
+  renderAudio();
+  toast(t('toast_added_audio'));
+}
+
+function aDelete(i) {
+  audioList.splice(i, 1);
+  save('ythelper_audio', audioList);
+  renderAudio();
+}
+
+function renderAudio() {
+  const wrap = $('a-list');
+  $('a-count').textContent = audioList.length ? `(${audioList.length}${t('count_unit')})` : '';
+  if (!audioList.length) {
+    wrap.innerHTML = `<div class="list-empty">${t('empty_list')}</div>`;
+  } else {
+    wrap.innerHTML = audioList.map((it, i) => {
+      const br = it.bitrate || '192';
+      const sec = it.section ? `${t('sec_label')} ${esc(it.section)}` : t('sec_full');
+      return `<div class="list-item">
+        <span class="num">${i+1}</span>
+        <div class="body">
+          <div class="name">${esc(it.name)}<span class="date-ph">_${br}k_${t('date_ph')}</span><span class="ext">.mp3</span></div>
+          <div class="info"><span class="tag">mp3 ${br}k</span> · ${sec}<br>${esc(it.url)}</div>
+        </div>
+        <button class="del-btn" data-a-del="${i}" title="×">×</button>
+      </div>`;
+    }).join('');
+  }
+  renderAudioPreview();
+}
+
+// 오디오목록.txt 본문 (URL | 구간 | 비트레이트 | 파일명)
+function audioTxt() {
+  const lines = audioList.map(it =>
+    `${it.url} | ${it.section} | ${it.bitrate} | ${it.name}`
+  );
+  return t('txt_header_audio') + '\n' + lines.join('\n') + '\n';
+}
+
+function audioCmd() {
+  if (!audioList.length) return t('cmd_empty');
+  // 현재 폴더 안에 movie·audio 폴더 생성 → 오디오는 audio 폴더에 저장
+  const out = ['New-Item -ItemType Directory -Force movie, audio | Out-Null', ''];
+  audioList.forEach((it, i) => {
+    const br = it.bitrate || '192';
+    let cmd = `yt-dlp -x --audio-format mp3 --audio-quality ${br}K --embed-metadata --embed-thumbnail`;
+    if (it.section) cmd += ` --download-sections "*${it.section}"`;
+    cmd += ` -o "audio\\${it.name}_${br}k_%(upload_date)s.%(ext)s" "${it.url}"`;
+    out.push(`# [${i+1}] ${it.name}  (mp3 ${br}k${it.section ? t('cmd_sec')+it.section : ''})`);
+    out.push(cmd);
+    out.push('');
+  });
+  return out.join('\n').trim();
+}
+
+function renderAudioPreview() {
+  const box = $('a-preview');
+  if (!audioList.length) {
+    box.innerHTML = `<span class="c-comment">${esc(t('preview_empty'))}</span>`;
+    return;
+  }
+  box.innerHTML = colorTxt(audioTxt());
+}
+
+/* =========================================================
+   공통: 영상 제목 가져오기 (oEmbed)
+   - 서버 없이 유튜브 공개 정보 창구(oEmbed) 사용
+   - 공식 → noembed 순서로 시도 (한 곳 막히면 다음)
+========================================================= */
+async function fetchTitle(url) {
+  const endpoints = [
+    `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
+    `https://noembed.com/embed?url=${encodeURIComponent(url)}`
+  ];
+  for (const ep of endpoints) {
+    try {
+      const res = await fetch(ep);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data && data.title) return data.title;
+    } catch (e) { /* 다음 엔드포인트로 */ }
+  }
+  return null;
+}
+
+// 영상 제목 → 안전한 파일명 (공백은 _, 금지문자·이모지 제거)
+function sanitizeName(title) {
+  return title
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{200D}]/gu, '') // 이모지·기호·변형선택자 제거
+    .replace(/[\\/:*?"<>|]/g, '')  // 윈도우 금지문자 제거
+    .replace(/[#]/g, '')           // 목록에서 주석으로 오인되는 # 제거
+    .replace(/\s+/g, '_')          // 공백 → 밑줄
+    .replace(/_+/g, '_')           // 연속 밑줄 정리
+    .replace(/^_+|_+$/g, '')       // 양끝 밑줄 제거
+    .slice(0, 80);                 // 너무 길면 자르기
+}
+
+// 버튼 눌렀을 때 공통 처리 (urlId의 URL로 제목 받아 nameId 채움)
+async function handleFetch(btn, urlId, nameId, errId) {
+  const url = $(urlId).value.trim();
+  $(errId).textContent = '';
+  if (!looksLikeUrl(url)) {
+    $(errId).textContent = t('err_url_first');
+    return;
+  }
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t('fetching');
+  const title = await fetchTitle(url);
+  btn.disabled = false;
+  btn.textContent = original;
+
+  if (title) {
+    $(nameId).value = sanitizeName(title);
+    $(nameId).classList.remove('invalid');
+    toast(t('toast_got_title'));
+  } else {
+    $(errId).textContent = t('err_title_fail');
+  }
+}
+
+/* =========================================================
+   공통: 텍스트 색칠 / 다운로드 / 복사
+========================================================= */
+// 미리보기 박스용 간단 구문 강조 (주석/구분자)
+function colorTxt(txt) {
+  return esc(txt)
+    .split('\n')
+    .map(line => {
+      if (line.trim().startsWith('#')) return `<span class="c-comment">${line}</span>`;
+      return line.replace(/\|/g, '<span class="c-highlight">|</span>');
+    })
+    .join('\n');
+}
+
+function downloadTxt(filename, content) {
+  // UTF-8 BOM 추가 → PowerShell 5.1에서 한글 안 깨지게 (스크립트 요구사항)
+  const bom = '﻿';
+  const blob = new Blob([bom + content], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+async function copyText(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(label + ' ' + t('copied'));
+  } catch {
+    // 구형 브라우저 폴백
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast(label + ' ' + t('copied'));
+  }
+}
+
+/* =========================================================
+   이벤트 연결
+========================================================= */
+// 영상
+$('v-fetch').addEventListener('click', e => handleFetch(e.currentTarget, 'v-url', 'v-name', 'v-name-err'));
+$('v-add').addEventListener('click', vAdd);
+$('v-name').addEventListener('keydown', e => { if (e.key === 'Enter') vAdd(); });
+$('v-dl-txt').addEventListener('click', () => {
+  if (!videoList.length) return toast(t('toast_empty'));
+  downloadTxt('다운목록.txt', videoTxt());
+  toast(t('toast_saved_v'));
+});
+$('v-copy-cmd').addEventListener('click', () => {
+  if (!videoList.length) return toast(t('toast_empty'));
+  copyText(videoCmd(), t('lbl_cmd'));
+});
+$('v-clear').addEventListener('click', () => {
+  if (!videoList.length) return;
+  if (confirm(t('confirm_clear_v'))) {
+    videoList = []; save('ythelper_video', videoList); renderVideo();
+    toast(t('toast_cleared_v'));
+  }
+});
+$('v-list').addEventListener('click', e => {
+  const b = e.target.closest('[data-v-del]');
+  if (b) vDelete(Number(b.dataset.vDel));
+});
+
+// 오디오
+$('a-fetch').addEventListener('click', e => handleFetch(e.currentTarget, 'a-url', 'a-name', 'a-name-err'));
+$('a-add').addEventListener('click', aAdd);
+$('a-name').addEventListener('keydown', e => { if (e.key === 'Enter') aAdd(); });
+$('a-dl-txt').addEventListener('click', () => {
+  if (!audioList.length) return toast(t('toast_empty'));
+  downloadTxt('오디오목록.txt', audioTxt());
+  toast(t('toast_saved_a'));
+});
+$('a-copy-cmd').addEventListener('click', () => {
+  if (!audioList.length) return toast(t('toast_empty'));
+  copyText(audioCmd(), t('lbl_cmd'));
+});
+$('a-clear').addEventListener('click', () => {
+  if (!audioList.length) return;
+  if (confirm(t('confirm_clear_a'))) {
+    audioList = []; save('ythelper_audio', audioList); renderAudio();
+    toast(t('toast_cleared_a'));
+  }
+});
+$('a-list').addEventListener('click', e => {
+  const b = e.target.closest('[data-a-del]');
+  if (b) aDelete(Number(b.dataset.aDel));
+});
+
+// 설치 프롬프트 복사 (박스 내용 그대로)
+$('copy-install').addEventListener('click', () => copyText($('install-prompt').textContent, t('lbl_install')));
+
+/* =========================================================
+   초기화
+========================================================= */
+applyTheme(localStorage.getItem('ythelper_theme') || 'dark');
+applyLang(LANG);  // 정적 텍스트 채우고 첫 렌더까지 수행
+</script>
+</body>
+</html>
