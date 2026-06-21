@@ -765,6 +765,7 @@ PowerShell은 기본 5.1을 그대로 쓰면 되고, PowerShell 7이 필요하�
     confirm_clear_v: '영상 목록을 전부 비울까요?', confirm_clear_a: '오디오 목록을 전부 비울까요?',
     theme_to_light: '☀️ 라이트', theme_to_dark: '🌙 다크',
     cmd_sec: ', 구간 ', cmd_empty: '# 목록이 비어 있어요.', cmd_open: '# 완료 후 저장 폴더 열기',
+    cmd_result: 'Write-Host "전체 $($ok+$fail)개 / 성공 ${ok}개 / 실패 ${fail}개" -ForegroundColor Cyan',
     txt_header_video:
 `# 다운로드 목록
 # 형식: URL | 시작-끝 | 배속 | 해상도 | 파일명
@@ -853,6 +854,7 @@ Make every step work on both Windows 10 and 11.`,
     confirm_clear_v: 'Clear the entire video list?', confirm_clear_a: 'Clear the entire audio list?',
     theme_to_light: '☀️ Light', theme_to_dark: '🌙 Dark',
     cmd_sec: ', sec ', cmd_empty: '# The list is empty.', cmd_open: '# Open the save folder when done',
+    cmd_result: 'Write-Host "Total $($ok+$fail) / OK $ok / Fail $fail" -ForegroundColor Cyan',
     txt_header_video:
 `# Download list
 # Format: URL | start-end | speed | resolution | filename
@@ -1056,7 +1058,7 @@ function videoCmd() {
   if (!videoList.length) return t('cmd_empty');
   // 다운로드 폴더 아래 yt-dlp\movie 에 저장 (PowerShell 어디서 실행하든 절대경로)
   const dir = '$HOME\\Downloads\\yt-dlp\\movie';
-  const out = [`New-Item -ItemType Directory -Force "${dir}" | Out-Null`, ''];
+  const out = ['$ok = 0; $fail = 0', `New-Item -ItemType Directory -Force "${dir}" | Out-Null`, ''];
   videoList.forEach((it, i) => {
     const res = it.resolution || '1080';
     const spd = it.speed || '1.0';
@@ -1074,8 +1076,10 @@ function videoCmd() {
       out.push(`ffmpeg -y -i "${dir}\\_temp_${it.name}.mp4" -filter_complex "[0:v]setpts=PTS/${spd}[v];[0:a]atempo=${spd}[a]" -map "[v]" -map "[a]" "${dir}\\${it.name}_$($d).mp4"`);
       out.push(`Remove-Item "${dir}\\_temp_${it.name}.mp4"`);
     }
+    out.push('if ($LASTEXITCODE -eq 0) { $ok++ } else { $fail++ }');
     out.push('');
   });
+  out.push(t('cmd_result'));
   out.push(t('cmd_open'));
   out.push(`explorer "${dir}"`);
   return out.join('\n').trim();
@@ -1177,7 +1181,7 @@ function audioCmd() {
   if (!audioList.length) return t('cmd_empty');
   // 다운로드 폴더 아래 yt-dlp\audio 에 저장 (PowerShell 어디서 실행하든 절대경로)
   const dir = '$HOME\\Downloads\\yt-dlp\\audio';
-  const out = [`New-Item -ItemType Directory -Force "${dir}" | Out-Null`, ''];
+  const out = ['$ok = 0; $fail = 0', `New-Item -ItemType Directory -Force "${dir}" | Out-Null`, ''];
   audioList.forEach((it, i) => {
     const br = it.bitrate || '192';
     let cmd = `yt-dlp -x --audio-format mp3 --audio-quality ${br}K --embed-metadata --embed-thumbnail`;
@@ -1185,8 +1189,10 @@ function audioCmd() {
     cmd += ` -o "${dir}\\${it.name}_${br}k_%(upload_date)s.%(ext)s" "${it.url}"`;
     out.push(`# [${i+1}] ${it.name}  (mp3 ${br}k${it.section ? t('cmd_sec')+it.section : ''})`);
     out.push(cmd);
+    out.push('if ($LASTEXITCODE -eq 0) { $ok++ } else { $fail++ }');
     out.push('');
   });
+  out.push(t('cmd_result'));
   out.push(t('cmd_open'));
   out.push(`explorer "${dir}"`);
   return out.join('\n').trim();
