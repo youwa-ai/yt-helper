@@ -1066,7 +1066,7 @@ function videoCmd() {
     const spd = it.speed || '1.0';
     const fmt = `bv*[height<=${res}]+ba[ext=m4a]/bv*[height<=${res}]+ba`;
     let base = `yt-dlp -N 4 -f "${fmt}" --merge-output-format mp4`;
-    if (it.section) base += ` --download-sections "*${it.section}"`;
+    if (it.section) base += ` --download-sections "*${it.section}" --force-keyframes-at-cuts`;
 
     out.push(`# [${i+1}] ${it.name}  (${res}p, ${spd}x${it.section ? t('cmd_sec')+it.section : ''})`);
     out.push(`Write-Host "[${i+1}] ${it.name} - ${t('cmd_downloading')}" -ForegroundColor Cyan`);
