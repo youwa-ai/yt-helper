@@ -1,0 +1,644 @@
+<title>통학수단 함정</title>
+<meta name="description" content="학생 생활습관 설문 예시 데이터로 보는 '작은 표본이 만드는 착시' 시각화">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --page-bg:      #f6f8fa;
+    --card-bg:      #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:   #898781;
+    --gridline:     #e1e0d9;
+    --axis:         #c3c2b7;
+    --border:       rgba(11,11,11,0.10);
+    --series-1:     #2a78d6;
+    --series-1-soft: rgba(42,120,214,0.16);
+    --mean-tick:    #0b0b0b;
+    --warning:      #fab219;
+    --warning-bg:   rgba(250,178,25,0.13);
+    --warning-border: rgba(250,178,25,0.45);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page-bg:      #0d0f12;
+      --card-bg:      #1a1a19;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:   #898781;
+      --gridline:     #2c2c2a;
+      --axis:         #383835;
+      --border:       rgba(255,255,255,0.10);
+      --series-1:     #3987e5;
+      --series-1-soft: rgba(57,135,229,0.22);
+      --mean-tick:    #ffffff;
+      --warning:      #fab219;
+      --warning-bg:   rgba(250,178,25,0.14);
+      --warning-border: rgba(250,178,25,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page-bg:      #0d0f12;
+    --card-bg:      #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:   #898781;
+    --gridline:     #2c2c2a;
+    --axis:         #383835;
+    --border:       rgba(255,255,255,0.10);
+    --series-1:     #3987e5;
+    --series-1-soft: rgba(57,135,229,0.22);
+    --mean-tick:    #ffffff;
+    --warning:      #fab219;
+    --warning-bg:   rgba(250,178,25,0.14);
+    --warning-border: rgba(250,178,25,0.4);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  .mono {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 20px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  header.hero {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .eyebrow {
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--series-1);
+  }
+  h1 {
+    margin: 0;
+    font-size: 28px;
+    line-height: 1.25;
+    font-weight: 700;
+    text-wrap: balance;
+  }
+  .dek {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    max-width: 62ch;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .card h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .card .sub {
+    margin: -8px 0 0;
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  .key-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+  .key-line span { display: inline-flex; align-items: center; gap: 6px; }
+  .key-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--series-1); opacity: 0.8; display: inline-block; }
+  .key-tick { width: 12px; height: 2px; background: var(--mean-tick); display: inline-block; }
+  .key-line-red { width: 14px; height: 2px; background: var(--text-secondary); display: inline-block; }
+
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+  }
+  svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+  .axis-label { fill: var(--text-muted); font-size: 11px; }
+  .grid-line { stroke: var(--gridline); stroke-width: 1; }
+  .axis-line { stroke: var(--axis); stroke-width: 1; }
+  .cat-label { fill: var(--text-secondary); font-size: 12px; font-weight: 600; }
+  .n-label { fill: var(--text-muted); font-size: 10.5px; }
+  .mean-label { fill: var(--text-primary); font-size: 11.5px; font-weight: 600; }
+
+  .dot {
+    fill: var(--series-1);
+    fill-opacity: 0.82;
+    stroke: var(--card-bg);
+    stroke-width: 2px;
+    transition: fill-opacity 120ms ease;
+  }
+  .hit { fill: transparent; cursor: pointer; }
+  .hit:hover + .dot, .hit:focus + .dot { fill-opacity: 1; }
+  .mean-tick-line { stroke: var(--mean-tick); stroke-width: 2.5px; stroke-linecap: round; }
+  .trend-line { stroke: var(--text-secondary); stroke-width: 2px; stroke-linecap: round; }
+
+  .callout {
+    position: absolute;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    max-width: 168px;
+    pointer-events: none;
+  }
+  .callout .ic { color: var(--warning); font-weight: 700; margin-right: 3px; }
+
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--text-primary);
+    color: var(--card-bg);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translate(-50%, -100%);
+    transition: opacity 100ms ease;
+    z-index: 5;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .v { font-weight: 700; }
+
+  .stat-chip {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: right;
+    line-height: 1.5;
+  }
+  .stat-chip .v { color: var(--text-primary); font-weight: 700; font-size: 13.5px; }
+
+  .takeaway {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 18px 20px;
+    border-left: 3px solid var(--series-1);
+    background: var(--series-1-soft);
+    border-radius: 0 8px 8px 0;
+  }
+  .takeaway p { margin: 0; font-size: 13.5px; line-height: 1.7; color: var(--text-primary); }
+  .takeaway strong { font-weight: 700; }
+
+  .toggle-row { display: flex; justify-content: flex-end; }
+  button.toggle {
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  button.toggle:hover { color: var(--text-primary); border-color: var(--axis); }
+  button.toggle:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+  table.data {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 12.5px;
+    min-width: 620px;
+  }
+  table.data th, table.data td {
+    padding: 7px 10px;
+    text-align: right;
+    border-bottom: 1px solid var(--gridline);
+    white-space: nowrap;
+  }
+  table.data th:first-child, table.data td:first-child,
+  table.data th:nth-child(2), table.data td:nth-child(2) { text-align: left; }
+  table.data thead th {
+    color: var(--text-muted);
+    font-weight: 600;
+    background: var(--card-bg);
+    position: sticky;
+    top: 0;
+  }
+  table.data td { color: var(--text-secondary); }
+  table.data td.miss { color: var(--warning); font-style: italic; }
+
+  footer.note {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    line-height: 1.7;
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+  }
+
+  a { color: var(--series-1); }
+
+  [tabindex]:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="hero">
+    <div class="eyebrow">함정 사례 시각화 · 학생 생활습관 설문 (n=30)</div>
+    <h1>표본 2명이 만든 착시</h1>
+    <p class="dek">
+      "자전거 통학 학생이 잠을 가장 적게 잔다"는 문장은 숫자로는 맞다. 하지만 그 숫자를 만든 사람은
+      단 2명뿐이고, 그중 1명은 통학과 무관한 이유로 잠을 줄인 학생이다. 평균 뒤의 점을 하나씩 펼쳐보면
+      무엇이 보이는지 확인한다.
+    </p>
+  </header>
+
+  <section class="card" id="card-trap">
+    <h2>통학수단별 수면시간 — 점 하나하나가 학생 한 명</h2>
+    <p class="sub">막대가 아니라 학생 개개인을 점으로 찍었다. 굵은 가로선은 그룹 평균. 점을 펼쳐보면 그룹마다 인원이 다르다는 게 바로 보인다.</p>
+    <div class="key-line">
+      <span><i class="key-dot"></i>학생 1명 (수면시간)</span>
+      <span><i class="key-tick"></i>그룹 평균</span>
+    </div>
+    <div class="chart-wrap" id="wrap-trap">
+      <svg class="chart" id="chart-trap" viewBox="0 0 680 380" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="tooltip mono" id="tooltip-trap"></div>
+    </div>
+  </section>
+
+  <section class="card" id="card-scatter">
+    <h2>비교 — 스마트폰 사용시간과 수면시간은 실제로 관계가 있다</h2>
+    <p class="sub">같은 데이터에서 진짜로 존재하는 관계. 점 29명 전체가 재료이고, 상관계수는 약한~중간 수준이다.</p>
+    <div class="key-line">
+      <span><i class="key-dot"></i>학생 1명</span>
+      <span><i class="key-line-red"></i>추세선</span>
+    </div>
+    <div class="chart-wrap" id="wrap-scatter">
+      <svg class="chart" id="chart-scatter" viewBox="0 0 680 380" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="stat-chip mono" id="stat-chip">r = <span class="v">−0.386</span><br>n = 29</div>
+      <div class="tooltip mono" id="tooltip-scatter"></div>
+    </div>
+  </section>
+
+  <div class="takeaway">
+    <p><strong>같은 데이터, 다른 신뢰도.</strong> 위 차트의 상관계수 −0.386은 29명 전체를 근거로 한다.
+    아래 자전거 그룹의 "6시간"은 단 2명, 그마저 1명의 개인 사정이 절반의 비중을 차지한다.
+    숫자가 그럴듯해 보여도 <strong>몇 명의 데이터로 만들어졌는지</strong>를 먼저 확인해야 하는 이유다.</p>
+  </div>
+
+  <section class="card" id="card-table">
+    <div class="toggle-row">
+      <button class="toggle" id="table-toggle" aria-expanded="false" aria-controls="table-area">표로 보기</button>
+    </div>
+    <div id="table-area" style="display:none;">
+      <div class="table-scroll">
+        <table class="data mono" id="data-table">
+          <thead>
+            <tr>
+              <th>번호</th><th>통학수단</th><th>통학시간(분)</th><th>폰사용(분)</th>
+              <th>취침</th><th>기상</th><th>수면(분)</th><th>운동(회/주)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer class="note">
+    데이터: <code>student_lifestyle_survey.csv</code> (가상 데이터, 학생 30명) · 자세한 분석 흐름은
+    <em>gpt-data-analysis-worked-example.md</em> 참고. 결측값 2건(8번 운동횟수, 20번 폰사용시간)은 계산에서 제외했다.
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var students = [
+    {no:1,  mode:"지하철", commute:50, phone:72,  sleep:476},
+    {no:2,  mode:"도보",   commute:7,  phone:134, sleep:456},
+    {no:3,  mode:"버스",   commute:38, phone:138, sleep:514},
+    {no:4,  mode:"자전거", commute:19, phone:206, sleep:250},
+    {no:5,  mode:"버스",   commute:37, phone:242, sleep:494},
+    {no:6,  mode:"자전거", commute:13, phone:187, sleep:470},
+    {no:7,  mode:"버스",   commute:30, phone:179, sleep:469},
+    {no:8,  mode:"도보",   commute:8,  phone:263, sleep:496, exerciseMissing:true},
+    {no:9,  mode:"버스",   commute:22, phone:207, sleep:486},
+    {no:10, mode:"버스",   commute:30, phone:246, sleep:432},
+    {no:11, mode:"지하철", commute:29, phone:90,  sleep:500},
+    {no:12, mode:"지하철", commute:46, phone:98,  sleep:479},
+    {no:13, mode:"지하철", commute:29, phone:255, sleep:459},
+    {no:14, mode:"버스",   commute:30, phone:147, sleep:459},
+    {no:15, mode:"지하철", commute:54, phone:77,  sleep:442},
+    {no:16, mode:"지하철", commute:55, phone:238, sleep:393},
+    {no:17, mode:"지하철", commute:44, phone:225, sleep:483},
+    {no:18, mode:"도보",   commute:9,  phone:243, sleep:486},
+    {no:19, mode:"지하철", commute:54, phone:150, sleep:526},
+    {no:20, mode:"지하철", commute:28, phone:null,sleep:457},
+    {no:21, mode:"지하철", commute:40, phone:161, sleep:492},
+    {no:22, mode:"버스",   commute:34, phone:162, sleep:454},
+    {no:23, mode:"도보",   commute:11, phone:281, sleep:412},
+    {no:24, mode:"지하철", commute:47, phone:234, sleep:421},
+    {no:25, mode:"도보",   commute:7,  phone:81,  sleep:490},
+    {no:26, mode:"도보",   commute:8,  phone:63,  sleep:532},
+    {no:27, mode:"지하철", commute:43, phone:61,  sleep:533},
+    {no:28, mode:"버스",   commute:39, phone:204, sleep:435},
+    {no:29, mode:"도보",   commute:13, phone:218, sleep:479},
+    {no:30, mode:"버스",   commute:34, phone:290, sleep:441}
+  ];
+
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function bedInfoFor(no) {
+    var raw = {1:"22:09",2:"22:42",3:"22:53",4:"23:22",5:"22:58",6:"23:18",7:"23:09",8:"23:13",9:"23:01",10:"23:24",
+      11:"22:33",12:"23:03",13:"23:34",14:"23:05",15:"22:49",16:"23:35",17:"23:24",18:"23:19",19:"22:32",20:"22:59",
+      21:"22:51",22:"23:01",23:"23:43",24:"23:47",25:"22:09",26:"22:23",27:"22:00",28:"23:01",29:"23:27",30:"00:06"};
+    return raw[no];
+  }
+  function wakeInfoFor(no) {
+    var raw = {1:"06:05",2:"06:18",3:"07:27",4:"06:24",5:"07:12",6:"07:08",7:"06:58",8:"07:29",9:"07:07",10:"06:36",
+      11:"06:53",12:"07:02",13:"07:13",14:"06:44",15:"06:11",16:"06:08",17:"07:27",18:"07:25",19:"07:18",20:"06:36",
+      21:"07:03",22:"06:35",23:"06:35",24:"06:48",25:"06:19",26:"07:15",27:"06:53",28:"06:16",29:"07:26",30:"07:27"};
+    return raw[no];
+  }
+
+  // ---------- Chart 1: category jitter strip + mean tick ----------
+  (function renderTrap() {
+    var svg = document.getElementById("chart-trap");
+    var W = 680, H = 380;
+    var margin = { top: 24, right: 20, bottom: 46, left: 44 };
+    var plotW = W - margin.left - margin.right;
+    var plotH = H - margin.top - margin.bottom;
+
+    var order = ["도보", "지하철", "버스", "자전거"];
+    var groups = {};
+    order.forEach(function (m) { groups[m] = []; });
+    students.forEach(function (s) { groups[s.mode].push(s); });
+
+    var yMin = 220, yMax = 550;
+    function yScale(v) { return margin.top + plotH * (1 - (v - yMin) / (yMax - yMin)); }
+
+    // gridlines + axis labels (hours)
+    [240, 300, 360, 420, 480, 540].forEach(function (v) {
+      var y = yScale(v);
+      svg.appendChild(el("line", { x1: margin.left, x2: W - margin.right, y1: y, y2: y, class: "grid-line" }));
+      var t = el("text", { x: margin.left - 10, y: y + 4, class: "axis-label mono", "text-anchor": "end" });
+      t.textContent = (v / 60) + "h";
+      svg.appendChild(t);
+    });
+    svg.appendChild(el("line", { x1: margin.left, x2: margin.left, y1: margin.top, y2: H - margin.bottom, class: "axis-line" }));
+    svg.appendChild(el("line", { x1: margin.left, x2: W - margin.right, y1: H - margin.bottom, y2: H - margin.bottom, class: "axis-line" }));
+
+    var bandW = plotW / order.length;
+    var tooltip = document.getElementById("tooltip-trap");
+    var wrap = document.getElementById("wrap-trap");
+
+    order.forEach(function (mode, i) {
+      var cx = margin.left + bandW * i + bandW / 2;
+      var list = groups[mode].slice().sort(function (a, b) { return a.sleep - b.sleep; });
+      var n = list.length;
+      var mean = list.reduce(function (s, d) { return s + d.sleep; }, 0) / n;
+
+      // jitter x offsets: alternate outward from center, scaled to band
+      var unit = Math.min(16, (bandW * 0.6) / Math.max(n, 4));
+      list.forEach(function (s, idx) {
+        var rank = Math.ceil(idx / 2) * (idx % 2 === 0 ? 1 : -1);
+        var x = cx + rank * unit;
+        var y = yScale(s.sleep);
+
+        var hit = el("circle", { cx: x, cy: y, r: 13, class: "hit", tabindex: "0" });
+        var dot = el("circle", { cx: x, cy: y, r: 5, class: "dot" });
+        svg.appendChild(hit);
+        svg.appendChild(dot);
+
+        function show(evt) {
+          tooltip.innerHTML = "";
+          var l1 = document.createElement("div");
+          var strong = document.createElement("span");
+          strong.className = "v";
+          strong.textContent = (s.sleep / 60).toFixed(1) + "시간";
+          l1.appendChild(document.createTextNode(s.no + "번 · " + s.mode + " · "));
+          l1.appendChild(strong);
+          var l2 = document.createElement("div");
+          l2.textContent = "수면 " + s.sleep + "분 · 취침 " + bedInfoFor(s.no);
+          tooltip.appendChild(l1);
+          tooltip.appendChild(l2);
+          var r = wrap.getBoundingClientRect();
+          var pt = svg.createSVGPoint();
+          pt.x = x; pt.y = y;
+          var ctm = svg.getScreenCTM();
+          var sp = pt.matrixTransform(ctm);
+          tooltip.style.left = (sp.x - r.left) + "px";
+          tooltip.style.top = (sp.y - r.top - 12) + "px";
+          tooltip.classList.add("show");
+        }
+        function hide() { tooltip.classList.remove("show"); }
+        hit.addEventListener("pointerenter", show);
+        hit.addEventListener("pointermove", show);
+        hit.addEventListener("pointerleave", hide);
+        hit.addEventListener("focus", show);
+        hit.addEventListener("blur", hide);
+      });
+
+      // mean tick
+      var tickHalf = bandW * 0.28;
+      var my = yScale(mean);
+      svg.appendChild(el("line", { x1: cx - tickHalf, x2: cx + tickHalf, y1: my, y2: my, class: "mean-tick-line" }));
+      var meanLabel = el("text", { x: cx + tickHalf + 6, y: my + 4, class: "mean-label mono" });
+      meanLabel.textContent = (mean / 60).toFixed(1) + "h";
+      svg.appendChild(meanLabel);
+
+      // category label + n
+      var catLabel = el("text", { x: cx, y: H - margin.bottom + 20, class: "cat-label", "text-anchor": "middle" });
+      catLabel.textContent = mode;
+      svg.appendChild(catLabel);
+      var nLabel = el("text", { x: cx, y: H - margin.bottom + 35, class: "n-label mono", "text-anchor": "middle" });
+      nLabel.textContent = "n=" + n;
+      svg.appendChild(nLabel);
+    });
+
+    // callout on 자전거 group
+    var bikeIndex = order.indexOf("자전거");
+    var bikeCx = margin.left + bandW * bikeIndex + bandW / 2;
+    var callout = document.createElement("div");
+    callout.className = "callout";
+    callout.innerHTML = '<span class="ic">⚠</span>표본 2명뿐. 1명(250분)은 통학과 무관한 사정으로 짧게 잤다.';
+    wrap.appendChild(callout);
+    // position after layout via bounding box
+    requestAnimationFrame(function () {
+      var pt = svg.createSVGPoint();
+      pt.x = bikeCx; pt.y = margin.top - 6;
+      var ctm = svg.getScreenCTM();
+      var sp = pt.matrixTransform(ctm);
+      var r = wrap.getBoundingClientRect();
+      var left = sp.x - r.left - 84;
+      left = Math.max(4, Math.min(left, r.width - 172));
+      callout.style.left = left + "px";
+      callout.style.top = "0px";
+    });
+  })();
+
+  // ---------- Chart 2: scatter + trend line ----------
+  (function renderScatter() {
+    var svg = document.getElementById("chart-scatter");
+    var W = 680, H = 380;
+    var margin = { top: 20, right: 20, bottom: 44, left: 46 };
+    var plotW = W - margin.left - margin.right;
+    var plotH = H - margin.top - margin.bottom;
+
+    var pts = students.filter(function (s) { return s.phone !== null; });
+
+    var xMin = 40, xMax = 300;
+    var yMin = 220, yMax = 550;
+    function xScale(v) { return margin.left + plotW * (v - xMin) / (xMax - xMin); }
+    function yScale(v) { return margin.top + plotH * (1 - (v - yMin) / (yMax - yMin)); }
+
+    [60, 120, 180, 240, 300].forEach(function (v) {
+      var x = xScale(v);
+      svg.appendChild(el("line", { x1: x, x2: x, y1: margin.top, y2: H - margin.bottom, class: "grid-line" }));
+      var t = el("text", { x: x, y: H - margin.bottom + 18, class: "axis-label mono", "text-anchor": "middle" });
+      t.textContent = v;
+      svg.appendChild(t);
+    });
+    [240, 300, 360, 420, 480, 540].forEach(function (v) {
+      var y = yScale(v);
+      svg.appendChild(el("line", { x1: margin.left, x2: W - margin.right, y1: y, y2: y, class: "grid-line" }));
+      var t = el("text", { x: margin.left - 10, y: y + 4, class: "axis-label mono", "text-anchor": "end" });
+      t.textContent = (v / 60) + "h";
+      svg.appendChild(t);
+    });
+    svg.appendChild(el("line", { x1: margin.left, x2: margin.left, y1: margin.top, y2: H - margin.bottom, class: "axis-line" }));
+    svg.appendChild(el("line", { x1: margin.left, x2: W - margin.right, y1: H - margin.bottom, y2: H - margin.bottom, class: "axis-line" }));
+
+    var xAxisLabel = el("text", { x: (margin.left + W - margin.right) / 2, y: H - 4, class: "axis-label", "text-anchor": "middle" });
+    xAxisLabel.textContent = "스마트폰 사용시간 (분)";
+    svg.appendChild(xAxisLabel);
+
+    // regression (least squares)
+    var n = pts.length;
+    var sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    pts.forEach(function (s) { sumX += s.phone; sumY += s.sleep; sumXY += s.phone * s.sleep; sumXX += s.phone * s.phone; });
+    var slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    var intercept = (sumY - slope * sumX) / n;
+    var x1 = xMin, x2 = xMax;
+    svg.appendChild(el("line", {
+      x1: xScale(x1), x2: xScale(x2),
+      y1: yScale(intercept + slope * x1), y2: yScale(intercept + slope * x2),
+      class: "trend-line"
+    }));
+
+    var tooltip = document.getElementById("tooltip-scatter");
+    var wrap = document.getElementById("wrap-scatter");
+
+    pts.forEach(function (s) {
+      var x = xScale(s.phone), y = yScale(s.sleep);
+      var hit = el("circle", { cx: x, cy: y, r: 13, class: "hit", tabindex: "0" });
+      var dot = el("circle", { cx: x, cy: y, r: 5, class: "dot" });
+      svg.appendChild(hit);
+      svg.appendChild(dot);
+
+      function show() {
+        tooltip.innerHTML = "";
+        var l1 = document.createElement("div");
+        var strong = document.createElement("span");
+        strong.className = "v";
+        strong.textContent = s.phone + "분";
+        l1.appendChild(document.createTextNode(s.no + "번 · 폰 "));
+        l1.appendChild(strong);
+        var l2 = document.createElement("div");
+        l2.textContent = "수면 " + s.sleep + "분 (" + (s.sleep / 60).toFixed(1) + "h) · " + s.mode;
+        tooltip.appendChild(l1);
+        tooltip.appendChild(l2);
+        var r = wrap.getBoundingClientRect();
+        var pt = svg.createSVGPoint();
+        pt.x = x; pt.y = y;
+        var ctm = svg.getScreenCTM();
+        var sp = pt.matrixTransform(ctm);
+        tooltip.style.left = (sp.x - r.left) + "px";
+        tooltip.style.top = (sp.y - r.top - 12) + "px";
+        tooltip.classList.add("show");
+      }
+      function hide() { tooltip.classList.remove("show"); }
+      hit.addEventListener("pointerenter", show);
+      hit.addEventListener("pointermove", show);
+      hit.addEventListener("pointerleave", hide);
+      hit.addEventListener("focus", show);
+      hit.addEventListener("blur", hide);
+    });
+  })();
+
+  // ---------- Table view ----------
+  (function renderTable() {
+    var tbody = document.querySelector("#data-table tbody");
+    students.forEach(function (s) {
+      var tr = document.createElement("tr");
+      function td(text, missing) {
+        var cell = document.createElement("td");
+        cell.textContent = text;
+        if (missing) cell.className = "miss";
+        tr.appendChild(cell);
+      }
+      td(String(s.no));
+      td(s.mode);
+      td(String(s.commute));
+      td(s.phone === null ? "결측" : String(s.phone), s.phone === null);
+      td(bedInfoFor(s.no));
+      td(wakeInfoFor(s.no));
+      td(String(s.sleep));
+      td(s.exerciseMissing ? "결측" : "", s.exerciseMissing);
+      tbody.appendChild(tr);
+    });
+
+    var btn = document.getElementById("table-toggle");
+    var area = document.getElementById("table-area");
+    btn.addEventListener("click", function () {
+      var open = area.style.display !== "none";
+      area.style.display = open ? "none" : "block";
+      btn.setAttribute("aria-expanded", String(!open));
+      btn.textContent = open ? "표로 보기" : "표 닫기";
+    });
+  })();
+})();
+</script>
