@@ -730,7 +730,10 @@ URL을 넣고 <code>🎯 제목 가져오기</code>로 파일명을 채워요. �
   <li><code>마우스 우클릭</code> 또는 <code>Ctrl+V</code>로 붙여넣고 <code>Enter</code>.</li>
   <li>저장 위치는 <code>다운로드\\yt-dlp</code>이며, 다운로드가 끝나면 <strong>저장된 폴더 열기 명령어가 자동으로 입력</strong>되니 <code>Enter</code>만 치면 폴더가 열려요. 파일명 끝엔 업로드 날짜가 붙어요.</li>
 </ol>
-<p style="margin-top:8px; color:var(--muted); font-size:13px;">※ 구간은 <code>00:30-02:15</code> 또는 <code>90-150</code>(초). 파일명의 금지문자·이모지는 자동 정리돼요. · 맨 아래 "목록 파일로 내보내기"는 목록을 백업하고 싶을 때 쓰는 선택 기능이에요.</p>`,
+<p style="margin-top:8px; color:var(--muted); font-size:13px;">※ 구간은 <code>00:30-02:15</code> 또는 <code>90-150</code>(초). 파일명의 금지문자·이모지는 자동 정리돼요. · 맨 아래 "목록 파일로 내보내기"는 목록을 백업하고 싶을 때 쓰는 선택 기능이에요.</p>
+<p style="margin-top:14px;"><strong>⚠ 다운로드가 안 될 때 (403 Forbidden 등 오류)</strong></p>
+<p style="color:var(--muted); font-size:13px;">유튜브가 정책을 자주 바꿔서 yt-dlp가 오래되면 다운로드가 실패할 수 있어요. PowerShell에 아래 명령을 입력해 최신 버전으로 업데이트한 뒤 다시 시도해보세요.</p>
+<div class="output-box" style="margin-top:6px;">yt-dlp -U</div>`,
     guide_install_head:
 `<strong>🔧 처음이라면 — yt-dlp · ffmpeg 설치하기</strong><br>
 아직 yt-dlp·ffmpeg가 없다면, 아래 프롬프트를 복사해서 <strong>클로드(claude.ai 또는 Claude Code)</strong>에 붙여넣으세요. 클로드가 설치를 단계별로 도와줘요.`,
@@ -820,7 +823,10 @@ Paste a URL and fill the filename with <code>🎯 Get title</code>. Pick options
   <li>Paste with <code>right-click</code> or <code>Ctrl+V</code> and hit <code>Enter</code>.</li>
   <li>Files are saved under <code>Downloads\\yt-dlp</code>. When the download finishes, the "open folder" command is auto-entered — just press <code>Enter</code> to open it. The upload date is appended to each filename.</li>
 </ol>
-<p style="margin-top:8px; color:var(--muted); font-size:13px;">※ Section is <code>00:30-02:15</code> or <code>90-150</code> (sec). Forbidden characters and emojis in filenames are cleaned automatically. · The "Export list file" at the bottom is an optional way to back up your list.</p>`,
+<p style="margin-top:8px; color:var(--muted); font-size:13px;">※ Section is <code>00:30-02:15</code> or <code>90-150</code> (sec). Forbidden characters and emojis in filenames are cleaned automatically. · The "Export list file" at the bottom is an optional way to back up your list.</p>
+<p style="margin-top:14px;"><strong>⚠ If a download fails (e.g. 403 Forbidden)</strong></p>
+<p style="color:var(--muted); font-size:13px;">YouTube changes its policies often, and an outdated yt-dlp can fail to download. Run the command below in PowerShell to update to the latest version, then try again.</p>
+<div class="output-box" style="margin-top:6px;">yt-dlp -U</div>`,
     guide_install_head:
 `<strong>🔧 First time? — Install yt-dlp · ffmpeg</strong><br>
 If you don't have yt-dlp·ffmpeg yet, copy the prompt below and paste it into <strong>Claude (claude.ai or Claude Code)</strong>. Claude will walk you through the install.`,
