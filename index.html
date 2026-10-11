@@ -738,14 +738,23 @@ URL을 넣고 <code>🎯 제목 가져오기</code>로 파일명을 채워요. �
 `<strong>🔧 처음이라면 — yt-dlp · ffmpeg 설치하기</strong><br>
 아직 yt-dlp·ffmpeg가 없다면, 아래 프롬프트를 복사해서 <strong>클로드(claude.ai 또는 Claude Code)</strong>에 붙여넣으세요. 클로드가 설치를 단계별로 도와줘요.`,
     install_prompt:
-`내 윈도우 PC(윈도우 10 또는 11)에 유튜브 영상·오디오를 다운로드할 환경을 만들고 싶어.
-먼저 내 윈도우 버전과 winget 사용 가능 여부를 확인해줘.
-- winget이 있으면 winget으로 yt-dlp와 ffmpeg를 설치해줘.
-- winget이 없으면(특히 윈도우 10) App Installer를 업데이트하거나, winget 없이 설치하는 대안(scoop 또는 공식 사이트 직접 다운로드)으로 yt-dlp와 ffmpeg를 설치해줘.
-PowerShell은 기본 5.1을 그대로 쓰면 되고, PowerShell 7이 필요하면 그것도 안내해줘.
-설치가 끝나면 yt-dlp --version 과 ffmpeg -version 으로 잘 설치됐는지 확인하는 방법을 알려줘.
-설치 중 권한이나 실행 정책(ExecutionPolicy) 문제가 생기면 해결 방법도 함께 알려줘.
-각 단계는 윈도우 10·11 모두에서 따라 할 수 있게 설명해줘.`,
+`내 윈도우 PC(윈도우 10 또는 11)에 유튜브 영상·오디오 다운로드용으로 yt-dlp와 ffmpeg를 설치하고 싶어. 나는 초보자야.
+
+진행 방식:
+- 너는 내 PC를 직접 볼 수 없으니, 한 번에 한 단계씩 PowerShell에 입력할 명령어를 알려주고, 내가 결과를 붙여넣으면 그걸 보고 다음 단계로 넘어가줘.
+- 먼저 윈도우 버전과 winget 사용 가능 여부를 확인하는 명령어부터 알려줘.
+
+설치 방법 선택:
+- winget이 있으면 winget을 우선 사용해줘(가장 간단하고 업데이트도 쉬움).
+- winget이 없으면(특히 윈도우 10) App Installer 업데이트를 먼저 안내하고, 그래도 안 되면 scoop이나 공식 사이트 직접 다운로드로 설치해줘.
+- PowerShell은 기본 5.1로 충분해.
+
+권한·실행 정책:
+- 실행 정책(ExecutionPolicy) 문제가 생기면 보안을 최소한으로만 푸는 방법(-Scope CurrentUser 또는 Process)을 우선 안내해줘. Unrestricted처럼 PC 전체 보안을 낮추는 방법은 다른 방법이 없을 때만, 위험을 설명한 뒤에 알려줘.
+
+확인과 문제 해결:
+- 설치 후 yt-dlp --version 과 ffmpeg -version 으로 확인하게 해줘.
+- 명령어를 찾을 수 없다고 나오면, PowerShell 창을 닫고 새로 연 뒤 다시 확인하게 하고, 그래도 안 되면 원인을 같이 찾아줘.`,
     btn_copy_install: '📋 설치 프롬프트 복사',
     footer: 'yt-helper v1.0 · made by JEJE · <a href="https://www.threads.net/@youwa0v0" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">@youwa0v0</a>',
     // ---- JS 동적 문자열 ----
@@ -831,14 +840,23 @@ Paste a URL and fill the filename with <code>🎯 Get title</code>. Pick options
 `<strong>🔧 First time? — Install yt-dlp · ffmpeg</strong><br>
 If you don't have yt-dlp·ffmpeg yet, copy the prompt below and paste it into <strong>Claude (claude.ai or Claude Code)</strong>. Claude will walk you through the install.`,
     install_prompt:
-`I want to set up my Windows PC (Windows 10 or 11) to download YouTube videos and audio.
-First, check my Windows version and whether winget is available.
-- If winget is available, install yt-dlp and ffmpeg with winget.
-- If winget is missing (often on Windows 10), help me update App Installer, or use an alternative (scoop or direct download from the official sites) to install yt-dlp and ffmpeg.
-The built-in PowerShell 5.1 is fine; if PowerShell 7 is needed, guide me through that too.
-After installing, show me how to verify with yt-dlp --version and ffmpeg -version.
-If any permission or ExecutionPolicy issues come up, help me fix them.
-Make every step work on both Windows 10 and 11.`,
+`I want to install yt-dlp and ffmpeg on my Windows PC (Windows 10 or 11) to download YouTube videos and audio. I'm a beginner.
+
+How to proceed:
+- You can't see my PC directly, so give me one step at a time: tell me the PowerShell command to run, and once I paste the output, use it to decide the next step.
+- Start with the commands to check my Windows version and whether winget is available.
+
+Choosing an install method:
+- If winget is available, prefer it (simplest, and easy to update later).
+- If winget is missing (often on Windows 10), first guide me through updating App Installer; if that doesn't work, install via scoop or a direct download from the official sites.
+- The built-in PowerShell 5.1 is enough.
+
+Permissions and execution policy:
+- If an ExecutionPolicy issue comes up, prefer the narrowest fix (-Scope CurrentUser or Process). Only suggest options that lower security for the whole PC, like Unrestricted, if nothing else works, and explain the risk first.
+
+Verifying and troubleshooting:
+- After installing, have me verify with yt-dlp --version and ffmpeg -version.
+- If a command is not found, have me close and reopen PowerShell and check again; if it still fails, help me find the cause.`,
     btn_copy_install: '📋 Copy install prompt',
     footer: 'yt-helper v1.0 · made by JEJE · <a href="https://www.threads.net/@youwa0v0" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">@youwa0v0</a>',
     // ---- JS dynamic strings ----
