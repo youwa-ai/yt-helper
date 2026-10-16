@@ -86,6 +86,8 @@ textarea{width:100%;min-height:150px;resize:vertical;font-variant-numeric:tabula
 .opt label{display:block;cursor:pointer;margin:2px 0}
 .opt label small{color:var(--muted)}
 .exp .go{margin-left:auto;display:flex;flex-direction:column;gap:6px;min-width:200px}
+.opt label.off{opacity:.4;cursor:not-allowed}
+.note{margin-top:10px;padding:8px 12px;border:1px solid var(--warn);border-radius:8px;color:var(--warn);font-size:13px}
 .bar{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;margin-top:10px}
 .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
 #expStatus{margin-top:6px;font-size:13px;color:var(--muted);white-space:pre-line}
@@ -207,6 +209,7 @@ textarea{width:100%;min-height:150px;resize:vertical;font-variant-numeric:tabula
           <button id="bCancel" class="hidden">취소</button>
         </div>
       </div>
+      <div class="note hidden" id="codecNote"></div>
       <div class="bar"><i id="bar"></i></div>
       <div id="expStatus"></div>
     </div>
@@ -556,7 +559,8 @@ function openFile(file){
   if (S.file && S.segs.length && !confirm('다른 파일을 열면 현재 구간 목록이 지워져요. 계속할까요?')) return;
   if (S.url) URL.revokeObjectURL(S.url);
   Object.assign(S, {file, url:URL.createObjectURL(file), dur:0, segs:[], nextId:1, sel:null, draft:{start:null,end:null}, loop:false, undo:[], redo:[], fps:30});
-  inputReady = false;
+  inputReady = false; S.vcodec = ''; applyCodecRules();
+  $('expStatus').textContent = ''; $('bar').style.width = '0';
   $('fileName').textContent = `${file.name} · ${(file.size / 1048576).toFixed(1)}MB`;
   v.src = S.url;
   v.onloadedmetadata = () => {
@@ -564,7 +568,7 @@ function openFile(file){
     drop.classList.add('hidden'); $('main').classList.remove('hidden');
     renderRuler(); render(); makeThumbs();
     if (file.size > 1024 ** 3) toast('1GB가 넘는 파일은 브라우저 메모리가 부족할 수 있어요', 4000);
-    loadEngine().catch(() => {});                                           // 미리 엔진 준비
+    probePromise = probeCodec().catch(() => {});                            // 미리 엔진 준비 + 코덱 확인
   };
   v.onerror = () => toast('이 브라우저에서 재생할 수 없는 형식이에요 (코덱 미지원)', 4000);
   fi.value = '';
@@ -642,7 +646,7 @@ document.addEventListener('keydown', e => {
 const CORE = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';   // 워커가 module 타입이라 ESM 코어 사용
 const WORKER = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js';
 let ff = null, enginePromise = null, inputReady = false, busy = false, cancelled = false, logTail = [];
-let progCb = null;
+let progCb = null, engineURLs = null;                                          // 엔진 파일은 한 번만 내려받아 재사용
 
 function setEngine(text, cls){ const el = $('engine'); el.textContent = '엔진: ' + text; el.className = 'pill ' + (cls || ''); }
 async function blobURL(url, type, onProg){
@@ -660,11 +664,12 @@ function loadEngine(){
     const f = new FFmpegWASM.FFmpeg();
     f.on('log', ({message}) => { logTail.push(message); if (logTail.length > 30) logTail.shift(); });
     f.on('progress', ({progress}) => progCb?.(clamp(progress, 0, 1)));
-    const [w, c, m] = await Promise.all([
+    engineURLs ??= await Promise.all([
       blobURL(WORKER, 'text/javascript'),
       blobURL(CORE + '/ffmpeg-core.js', 'text/javascript'),
       blobURL(CORE + '/ffmpeg-core.wasm', 'application/wasm', (g, t) => setEngine(`내려받는 중 ${(g / 1048576).toFixed(0)}${t ? '/' + (t / 1048576).toFixed(0) : ''}MB`, 'busy')),
     ]);
+    const [w, c, m] = engineURLs;
     await f.load({classWorkerURL:w, coreURL:c, wasmURL:m});
     ff = f; setEngine('준비됨', 'ok');
     return f;
@@ -673,14 +678,50 @@ function loadEngine(){
 }
 const extOf = name => (name.match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase();
 const baseOf = name => name.replace(/\.[^.]+$/, '');
+// 한 번 오류가 난 엔진은 메모리가 망가져 있으므로 버리고 새로 띄운다
+function resetEngine(){
+  try { ff?.terminate(); } catch {}
+  ff = null; enginePromise = null; inputReady = false; setEngine('대기');
+}
 let inName = '';
 async function ensureInput(){
   if (inputReady) return;
-  status('영상을 엔진에 올리는 중…');
-  try { if (inName) await ff.deleteFile(inName); } catch {}
-  inName = 'input.' + extOf(S.file.name);
-  await ff.writeFile(inName, new Uint8Array(await S.file.arrayBuffer()));
+  status('영상을 엔진에 연결하는 중…');
+  try {                                                                        // 원본을 복사하지 않고 필요한 부분만 읽음
+    try { await ff.unmount('/in'); } catch {}
+    try { await ff.createDir('/in'); } catch {}
+    await ff.mount('WORKERFS', {files:[S.file]}, '/in');
+    inName = '/in/' + S.file.name;
+  } catch {                                                                    // WORKERFS를 못 쓰면 메모리에 복사
+    inName = 'input.' + extOf(S.file.name);
+    await ff.writeFile(inName, new Uint8Array(await S.file.arrayBuffer()));
+  }
   inputReady = true;
+}
+// 브라우저용 ffmpeg가 풀지 못하는 코덱 (재인코딩 = '정확하게' 모드 불가)
+const NO_DECODE = {av1:'AV1'};
+let probePromise = null;
+async function probeCodec(){
+  const file = S.file;
+  await loadEngine(); await ensureInput();
+  logTail = [];
+  await ff.exec(['-hide_banner', '-i', inName]);                              // 출력 없이 정보만 읽음 (종료 코드 1은 정상)
+  if (file !== S.file) return;
+  const line = logTail.find(l => /Stream #.*Video:/.test(l)) || '';
+  S.vcodec = (line.match(/Video:\s*(\w+)/) || [])[1] || '';
+  applyCodecRules();
+}
+function applyCodecRules(){
+  const bad = NO_DECODE[S.vcodec];
+  const exact = document.querySelector('[name=mode][value=exact]');
+  exact.disabled = !!bad;
+  exact.closest('label').classList.toggle('off', !!bad);
+  if (bad && exact.checked) document.querySelector('[name=mode][value=fast]').checked = true;
+  const note = $('codecNote');
+  note.classList.toggle('hidden', !bad);
+  if (bad) note.textContent = `⚠ 이 영상은 ${bad} 코덱이라 브라우저에서 '정확하게' 모드를 쓸 수 없어요. ` +
+    `'빠르게'로 자르면 시작점이 1~2초 어긋날 수 있어요. yt-helper로 다시 받으면 H.264로 받아져서 '정확하게' 모드도 쓸 수 있어요.`;
+  if (S.file && S.vcodec) $('fileName').textContent = `${S.file.name} · ${(S.file.size / 1048576).toFixed(1)}MB · ${S.vcodec.toUpperCase()}`;
 }
 async function run(args){
   logTail = [];
@@ -715,6 +756,7 @@ $('bExport').onclick = async () => {
   const t0 = performance.now();
   try {
     status('엔진 준비 중… (처음 한 번 약 30MB를 내려받아요)');
+    await probePromise;                                                        // 코덱 확인이 끝난 뒤 시작
     await loadEngine();
     await ensureInput();
     const parts = [];
@@ -746,15 +788,21 @@ $('bExport').onclick = async () => {
     toast('내보내기 완료');
   } catch (err) {
     if (err.message === 'cancel' || cancelled) { status('취소했어요'); bar(0); }
-    else { console.error(err); status('실패했어요: ' + (err.message || err) + (exact ? '' : '\n→ "정확하게" 모드로 다시 시도해 보세요')); }
+    else {
+      console.error(err);
+      const msg = String(err.message || err);
+      resetEngine();
+      status('실패했어요: ' + msg +
+        (/memory|Aborted|OOM/i.test(msg) ? '\n→ 메모리가 부족했어요. 엔진을 다시 시작했으니 구간을 나눠서 다시 시도해 보세요'
+          : exact ? '\n→ 엔진을 다시 시작했어요. 한 번 더 시도해 보세요' : '\n→ 엔진을 다시 시작했어요. "정확하게" 모드로 시도해 보세요'));
+    }
   } finally {
     busy = false; progCb = null; $('bCancel').classList.add('hidden'); render();
   }
 };
 $('bCancel').onclick = () => {
   cancelled = true;
-  try { ff?.terminate(); } catch {}
-  ff = null; enginePromise = null; inputReady = false; setEngine('대기');
+  resetEngine();
 };
 
 /* ---------- 토스트 ---------- */

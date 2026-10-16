@@ -1070,7 +1070,9 @@ function videoCmd() {
   videoList.forEach((it, i) => {
     const res = it.resolution || '1080';
     const spd = it.speed || '1.0';
-    const fmt = `bv*[height<=${res}]+ba[ext=m4a]/bv*[height<=${res}]+ba`;
+    // H.264(avc1) 우선: AV1/VP9는 편집기·브라우저 자르기 앱에서 다루기 어려움
+    // (유튜브 H.264는 1080p까지라 1440p 이상은 VP9/AV1로 받아짐)
+    const fmt = `bv*[height<=${res}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=${res}]+ba[ext=m4a]/bv*[height<=${res}]+ba`;
     const base = `yt-dlp -N 4 -f "${fmt}" --merge-output-format mp4`;
     // 구간·배속은 다운로드 후 내 PC에서 ffmpeg로 처리
     // (--download-sections는 ffmpeg 스트리밍 다운로드라 유튜브 속도제한에 걸려 파일이 깨짐)
