@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>영상 자르기</title>
+<style>
+:root{
+  --bg:#0f1115; --panel:#181b22; --panel2:#20242d; --line:#2c313c;
+  --text:#e8eaf0; --muted:#8b93a4; --accent:#4f8cff; --accent2:#3a6fd8;
+  --ok:#3ecf8e; --err:#ff5d6c; --warn:#ffb547;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 "Pretendard","Malgun Gothic",system-ui,sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+button:hover:not(:disabled){border-color:var(--accent)}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.primary:hover:not(:disabled){background:var(--accent2)}
+button.icon{padding:6px 9px}
+button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 10px;outline:none}
+input[type=text]:focus,textarea:focus{border-color:var(--accent)}
+input.bad{border-color:var(--err)!important}
+kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:12px;font-family:inherit}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+header h1{font-size:20px;margin:0}
+.pill{font-size:12px;padding:2px 10px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.pill.ok{color:var(--ok);border-color:var(--ok)} .pill.err{color:var(--err);border-color:var(--err)} .pill.busy{color:var(--warn);border-color:var(--warn)}
+header .file{margin-left:auto;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:45%}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.panel h2{font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:600}
+#drop{border:2px dashed var(--line);border-radius:14px;padding:70px 20px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s}
+#drop.over,#drop:hover{border-color:var(--accent);color:var(--text)}
+#drop b{display:block;font-size:18px;color:var(--text);margin-bottom:6px}
+.hidden{display:none!important}
+/* 플레이어 */
+.player{background:#000;border-radius:10px;overflow:hidden;display:flex;justify-content:center}
+.player video{max-width:100%;max-height:52vh;display:block;cursor:pointer}
+.controls{display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap}
+.controls .time{font-variant-numeric:tabular-nums;margin:0 8px;font-size:15px}
+.controls .sp{flex:1}
+/* 타임라인 */
+#tl{position:relative;height:64px;margin-top:12px;border-radius:8px;background:var(--panel2);overflow:hidden;cursor:pointer;user-select:none;touch-action:none}
+#thumbs{position:absolute;inset:0;width:100%;height:100%;opacity:.55}
+.seg{position:absolute;top:0;bottom:0;border:2px solid var(--c);background:color-mix(in srgb,var(--c) 28%,transparent);border-radius:4px;cursor:grab}
+.seg.sel{background:color-mix(in srgb,var(--c) 45%,transparent);box-shadow:0 0 0 2px #fff inset}
+.seg.draft{border-style:dashed;--c:#ffffff}
+.seg .h{position:absolute;top:0;bottom:0;width:10px;cursor:ew-resize;background:var(--c);opacity:.85}
+.seg .h.l{left:-2px}.seg .h.r{right:-2px}
+.seg .n{position:absolute;left:12px;top:3px;font-size:11px;font-weight:700;text-shadow:0 0 3px #000}
+#ph{position:absolute;top:0;bottom:0;width:2px;background:var(--err);pointer-events:none;box-shadow:0 0 4px var(--err)}
+.ruler{position:relative;height:16px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ruler span{position:absolute;transform:translateX(-50%)}
+.ruler span:first-child{transform:none}.ruler span:last-child{transform:translateX(-100%)}
+/* 편집기 */
+.editor{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:10px;align-items:start}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.field .row{display:flex;gap:6px}
+.field input{width:100%;min-width:0}
+.field .hint{font-size:12px;color:var(--muted);min-height:18px;margin-top:3px;font-variant-numeric:tabular-nums}
+.field .hint.err{color:var(--err)}
+.editor .act{display:flex;flex-direction:column;gap:6px;padding-top:21px}
+#edTitle{font-weight:600}
+#edTitle .tag{color:var(--accent)}
+/* 2단 */
+.cols{display:grid;grid-template-columns:1.3fr 1fr;gap:12px}
+.list{display:flex;flex-direction:column;gap:6px;max-height:330px;overflow:auto}
+.item{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);cursor:pointer}
+.item.sel{border-color:#fff}
+.item .dot{width:22px;height:22px;border-radius:6px;background:var(--c);color:#000;font-size:12px;font-weight:700;display:grid;place-items:center;flex:none}
+.item .tm{flex:1;font-variant-numeric:tabular-nums}
+.item .tm small{color:var(--muted);margin-left:6px}
+.item button{padding:3px 7px;font-size:12px}
+.empty{color:var(--muted);text-align:center;padding:24px 0}
+textarea{width:100%;min-height:150px;resize:vertical;font-variant-numeric:tabular-nums}
+.small{font-size:12px;color:var(--muted)}
+.msg{font-size:12px;margin-top:6px;white-space:pre-line}
+.msg.err{color:var(--err)}.msg.ok{color:var(--ok)}
+.btnrow{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+/* 내보내기 */
+.exp{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+.opt b{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600}
+.opt label{display:block;cursor:pointer;margin:2px 0}
+.opt label small{color:var(--muted)}
+.exp .go{margin-left:auto;display:flex;flex-direction:column;gap:6px;min-width:200px}
+.bar{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+#expStatus{margin-top:6px;font-size:13px;color:var(--muted);white-space:pre-line}
+.keys{color:var(--muted);font-size:12px;line-height:2}
+.keys span{margin-right:14px;white-space:nowrap}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:8px 16px;border-radius:99px;opacity:0;transition:.2s;pointer-events:none;z-index:9}
+#toast.show{opacity:1}
+@media (max-width:780px){
+  .editor{grid-template-columns:1fr}
+  .editor .act{flex-direction:row;padding-top:0}
+  .cols{grid-template-columns:1fr}
+  .exp .go{margin-left:0;width:100%}
+  header .file{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>✂️ 영상 자르기</h1>
+    <span id="engine" class="pill">엔진: 대기</span>
+    <span id="fileName" class="file"></span>
+  </header>
+
+  <!-- ① 불러오기 -->
+  <div id="drop">
+    <b>영상 파일을 여기에 끌어다 놓으세요</b>
+    또는 클릭해서 선택 · mp4, webm, mov 등 · 영상은 이 PC 밖으로 나가지 않아요
+    <input id="fileInput" type="file" accept="video/*,.mkv,.mov" hidden>
+  </div>
+
+  <div id="main" class="hidden">
+    <!-- ② 미리보기 + 타임라인 -->
+    <div class="panel">
+      <div class="player"><video id="v" playsinline preload="auto"></video></div>
+      <div class="controls">
+        <button id="bPlay" class="icon" title="재생/정지 (Space)">▶</button>
+        <button id="bBack1" class="icon" title="1초 뒤로 (←)">−1s</button>
+        <button id="bPrevF" class="icon" title="1프레임 뒤로 (,)">◀|</button>
+        <button id="bNextF" class="icon" title="1프레임 앞으로 (.)">|▶</button>
+        <button id="bFwd1" class="icon" title="1초 앞으로 (→)">+1s</button>
+        <span class="time" id="tNow">00:00.0 / 00:00.0</span>
+        <span class="sp"></span>
+        <button id="bLoop" title="편집 중인 구간 반복 재생 (L)">🔁 구간 반복</button>
+        <button id="bMute" class="icon" title="음소거 (M)">🔊</button>
+        <button id="bOpen" title="다른 파일 열기">📂 다른 파일</button>
+      </div>
+      <div id="tl"><canvas id="thumbs"></canvas><div id="segLayer"></div><div id="ph"></div></div>
+      <div class="ruler" id="ruler"></div>
+    </div>
+
+    <!-- ③ 구간 지정 -->
+    <div class="panel">
+      <h2 id="edTitle">새 구간</h2>
+      <div class="editor">
+        <div class="field">
+          <label>시작</label>
+          <div class="row"><input id="inStart" type="text" placeholder="예: 1분 30초"><button id="bSetS" title="현재 위치를 시작으로 (I)">현재 <kbd>I</kbd></button></div>
+          <div class="hint" id="hStart"></div>
+        </div>
+        <div class="field">
+          <label>끝</label>
+          <div class="row"><input id="inEnd" type="text" placeholder="예: 2분"><button id="bSetE" title="현재 위치를 끝으로 (O)">현재 <kbd>O</kbd></button></div>
+          <div class="hint" id="hEnd"></div>
+        </div>
+        <div class="field">
+          <label>길이</label>
+          <div class="row"><input id="inLen" type="text" placeholder="예: 30초"></div>
+          <div class="hint" id="hLen"></div>
+        </div>
+        <div class="act">
+          <button id="bAdd" class="primary">구간 추가 <kbd>Enter</kbd></button>
+          <button id="bDesel" class="hidden">선택 해제 <kbd>Esc</kbd></button>
+        </div>
+      </div>
+      <div class="small">입력 예: <code>1분 30초</code> · <code>1분,30초</code> · <code>90초</code> · <code>90</code> · <code>1:30.5</code> · <code>1시간 2분</code></div>
+    </div>
+
+    <!-- ④ 구간 목록 + 일괄 입력 -->
+    <div class="cols">
+      <div class="panel">
+        <h2 style="display:flex;align-items:center;gap:6px">구간 목록 <span id="segCount"></span>
+          <span style="margin-left:auto;display:flex;gap:6px">
+            <button id="bUndo" title="되돌리기 (Ctrl+Z)">↶ 되돌리기</button>
+            <button id="bRedo" title="다시 실행 (Ctrl+Y)">↷</button>
+            <button id="bClear" title="모든 구간 삭제">전체 삭제</button>
+          </span>
+        </h2>
+        <div class="list" id="list"></div>
+      </div>
+      <div class="panel">
+        <h2>구간 텍스트 일괄 입력</h2>
+        <textarea id="bulk" placeholder="한 줄에 한 구간씩&#10;1분-1분30초&#10;3분10초 ~ 4분&#10;5:00-5:20.5&#10;7분 +30초   (시작 +길이)"></textarea>
+        <div class="btnrow">
+          <button id="bBulk" class="primary">구간 등록</button>
+          <button id="bToText" title="현재 구간 목록을 텍스트로 옮겨 적기">목록 → 텍스트</button>
+          <button id="bCopy" title="텍스트 복사">복사</button>
+        </div>
+        <div class="msg" id="bulkMsg"></div>
+      </div>
+    </div>
+
+    <!-- ⑤ 내보내기 -->
+    <div class="panel">
+      <h2>내보내기</h2>
+      <div class="exp">
+        <div class="opt">
+          <b>저장 방식</b>
+          <label><input type="radio" name="out" value="each" checked> 각각 저장 <small>구간마다 파일 1개</small></label>
+          <label><input type="radio" name="out" value="merge"> 하나로 합치기 <small>목록 순서대로 이어 붙임</small></label>
+        </div>
+        <div class="opt">
+          <b>자르기 모드</b>
+          <label><input type="radio" name="mode" value="fast" checked> 빠르게 <small>무손실 · 시작점 ±1~2초 오차 가능</small></label>
+          <label><input type="radio" name="mode" value="exact"> 정확하게 <small>프레임 단위 · 재인코딩이라 느림</small></label>
+        </div>
+        <div class="go">
+          <button id="bExport" class="primary">내보내기</button>
+          <button id="bCancel" class="hidden">취소</button>
+        </div>
+      </div>
+      <div class="bar"><i id="bar"></i></div>
+      <div id="expStatus"></div>
+    </div>
+
+    <div class="keys">
+      <span><kbd>Space</kbd> 재생/정지</span><span><kbd>I</kbd>/<kbd>O</kbd> 시작/끝</span><span><kbd>Enter</kbd> 구간 추가</span>
+      <span><kbd>←</kbd>/<kbd>→</kbd> 1초 (<kbd>Shift</kbd> 5초)</span><span><kbd>,</kbd>/<kbd>.</kbd> 1프레임</span>
+      <span><kbd>L</kbd> 구간 반복</span><span><kbd>Del</kbd> 선택 구간 삭제</span><span><kbd>Ctrl</kbd>+<kbd>Z</kbd> 되돌리기</span><span><kbd>Esc</kbd> 선택 해제</span>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const v = $('v');
+const COLORS = ['#4f8cff','#3ecf8e','#ffb547','#ff6b9a','#a78bfa','#2dd4bf','#f97316','#e879f9'];
+const MIN_LEN = 0.05;
+
+const S = {
+  file:null, url:null, dur:0, fps:30,
+  segs:[], nextId:1, sel:null,           // sel: 편집 중인 구간 id (null이면 새 구간 초안)
+  draft:{start:null,end:null},
+  lenLast:false,                         // 마지막으로 '길이'를 입력했으면 시작 변경 시 끝을 다시 계산
+  loop:false, undo:[], redo:[],
+};
+
+/* ---------- 시간 해석 / 표시 ---------- */
+function parseTime(str){
+  let s = String(str ?? '').trim().replace(/，/g, ',');
+  if (!s) return null;
+  if (/^\d+(\.\d+)?$/.test(s)) return +s;                                   // 90, 90.5
+  if (/^\d+(:\d{1,2}){1,2}(\.\d+)?$/.test(s)) {                             // 1:30, 1:02:00.5
+    return s.split(':').reduce((a, p) => a * 60 + parseFloat(p), 0);
+  }
+  s = s.replace(/[\s,]+/g, '');                                              // "1분, 30초" → "1분30초"
+  const re = /(\d+(?:\.\d+)?)(시간|h|분|m|초|s)?/giy;
+  const units = {'시간':3600,h:3600,'분':60,m:60,'초':1,s:1};
+  const lower = {3600:60, 60:1};
+  let total = 0, prev = null, m, pos = 0, any = false;
+  while (pos < s.length) {
+    re.lastIndex = pos; m = re.exec(s);
+    if (!m || m.index !== pos) return null;
+    let mul = m[2] ? units[m[2].toLowerCase()] : (prev ? lower[prev] : 1);
+    if (!mul || (prev && mul >= prev)) return null;                          // 단위 순서: 시간 > 분 > 초
+    total += parseFloat(m[1]) * mul; prev = mul; pos = re.lastIndex; any = true;
+    if (!m[2] && pos < s.length) return null;
+  }
+  return any ? total : null;
+}
+function fmt(t, digits = 1){
+  if (t == null || isNaN(t)) return '--:--';
+  t = Math.max(0, t);
+  const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60);
+  let sec = (t % 60).toFixed(digits);
+  if (parseFloat(sec) >= 60) sec = (0).toFixed(digits);                    // 반올림 경계 처리
+  const ss = (parseFloat(sec) < 10 ? '0' : '') + sec;
+  return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + ss;
+}
+function fmtKo(t){                                                           // 텍스트 일괄 입력용
+  const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60);
+  const s = +(t % 60).toFixed(2);
+  return (h ? h + '시간' : '') + (m ? m + '분' : '') + (s || (!h && !m) ? s + '초' : '');
+}
+function fileStamp(t){
+  const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = +(t % 60).toFixed(1);
+  return (h ? h + 'h' : '') + String(m).padStart(2, '0') + 'm' + (s < 10 ? '0' : '') + s + 's';
+}
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const r3 = x => Math.round(x * 1000) / 1000;
+
+/* ---------- 상태 변경 · 되돌리기 ---------- */
+const snapshot = () => JSON.stringify({segs:S.segs, sel:S.sel});
+function pushUndo(){ S.undo.push(snapshot()); if (S.undo.length > 200) S.undo.shift(); S.redo = []; }
+function restore(json){ const o = JSON.parse(json); S.segs = o.segs; S.sel = S.segs.some(x => x.id === o.sel) ? o.sel : null; }
+function undo(){ if (!S.undo.length) return toast('되돌릴 작업이 없어요'); S.redo.push(snapshot()); restore(S.undo.pop()); render(); toast('되돌렸어요'); }
+function redo(){ if (!S.redo.length) return; S.undo.push(snapshot()); restore(S.redo.pop()); render(); toast('다시 실행했어요'); }
+
+const target = () => S.sel != null ? S.segs.find(x => x.id === S.sel) : S.draft;
+const colorOf = seg => COLORS[(S.segs.indexOf(seg)) % COLORS.length];
+
+function validRange(o){ return o && o.start != null && o.end != null && o.end - o.start >= MIN_LEN; }
+
+function setTargetTimes(start, end, {commit = true} = {}){
+  const t = target();
+  if (S.sel != null && commit) pushUndo();
+  if (start !== undefined) t.start = start == null ? null : r3(clamp(start, 0, S.dur));
+  if (end !== undefined) t.end = end == null ? null : r3(clamp(end, 0, S.dur));
+  render();
+}
+
+function addDraft(){
+  const d = S.draft;
+  if (!validRange(d)) return toast('시작과 끝을 먼저 지정해 주세요');
+  pushUndo();
+  S.segs.push({id:S.nextId++, start:d.start, end:d.end});
+  S.draft = {start:null, end:null}; S.lenLast = false;
+  render(); toast(`구간 ${S.segs.length} 추가`);
+}
+function removeSeg(id){
+  pushUndo();
+  S.segs = S.segs.filter(x => x.id !== id);
+  if (S.sel === id) S.sel = null;
+  render();
+}
+function moveSeg(id, dir){
+  const i = S.segs.findIndex(x => x.id === id), j = i + dir;
+  if (j < 0 || j >= S.segs.length) return;
+  pushUndo();
+  [S.segs[i], S.segs[j]] = [S.segs[j], S.segs[i]];
+  render();
+}
+function select(id){
+  S.sel = id; S.lenLast = false;
+  const t = target();
+  if (t && t.start != null) seek(t.start);
+  render();
+}
+
+/* ---------- 입력칸 ---------- */
+const inS = $('inStart'), inE = $('inEnd'), inL = $('inLen');
+function hint(el, hel, val, msg){
+  el.classList.toggle('bad', !!msg);
+  hel.className = 'hint' + (msg ? ' err' : '');
+  hel.textContent = msg || (val != null && el.value.trim() ? '→ ' + fmt(val, 2) : '');
+}
+function onField(which){
+  const t = target(); if (!t) return;
+  const raw = {s:inS.value, e:inE.value, l:inL.value}[which];
+  const val = parseTime(raw);
+  if (raw.trim() && val == null) { hint(...elems(which), null, '해석할 수 없어요 (예: 1분 30초)'); return; }
+  if (val != null && val > S.dur + 0.001) { hint(...elems(which), val, `영상 길이(${fmt(S.dur)})보다 길어요`); return; }
+  if (S.sel != null) pushUndo();
+  if (which === 's') {
+    t.start = val == null ? null : r3(val);
+    if (S.lenLast && t.start != null) { const L = parseTime(inL.value); if (L != null) t.end = r3(clamp(t.start + L, 0, S.dur)); }
+  } else if (which === 'e') {
+    t.end = val == null ? null : r3(val); S.lenLast = false;
+  } else {
+    S.lenLast = true;
+    if (val != null && t.start != null) t.end = r3(clamp(t.start + val, 0, S.dur));
+  }
+  render({keepFocus:true});
+}
+const elems = w => w === 's' ? [inS, $('hStart')] : w === 'e' ? [inE, $('hEnd')] : [inL, $('hLen')];
+inS.addEventListener('change', () => onField('s'));
+inE.addEventListener('change', () => onField('e'));
+inL.addEventListener('change', () => onField('l'));
+[['s',inS],['e',inE],['l',inL]].forEach(([w, el]) => {
+  el.addEventListener('input', () => {                                     // 입력 중 미리보기만
+    const val = parseTime(el.value), [, h] = elems(w);
+    hint(el, h, val, el.value.trim() && val == null ? '해석할 수 없어요 (예: 1분 30초)' : '');
+  });
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); onField(w);
+      if (S.sel == null && validRange(S.draft)) { addDraft(); inS.focus(); }
+      else el.blur();
+    }
+    if (e.key === 'Escape') el.blur();
+  });
+});
+
+/* ---------- 렌더 ---------- */
+function render(){
+  const t = target();
+  // 편집기
+  const editing = S.sel != null;
+  const idx = S.segs.findIndex(x => x.id === S.sel);
+  $('edTitle').innerHTML = editing ? `<span class="tag">구간 ${idx + 1}</span> 편집 중 <span class="small">— 바꾸면 바로 적용돼요</span>` : '새 구간';
+  $('bAdd').classList.toggle('hidden', editing);
+  $('bDesel').classList.toggle('hidden', !editing);
+  $('bAdd').disabled = !validRange(S.draft);
+  const focused = document.activeElement;
+  const setF = (el, val) => { if (focused !== el) el.value = val == null ? '' : fmt(val, 2); };
+  setF(inS, t?.start); setF(inE, t?.end);
+  const len = t && t.start != null && t.end != null ? t.end - t.start : null;
+  setF(inL, len);
+  hint(inS, $('hStart'), null, ''); hint(inE, $('hEnd'), null, '');
+  hint(inL, $('hLen'), null, len != null && len < MIN_LEN ? '끝이 시작보다 뒤여야 해요' : '');
+  if (len != null && len < MIN_LEN) inE.classList.add('bad');
+
+  // 타임라인
+  const layer = $('segLayer'); layer.innerHTML = '';
+  const block = (o, cls, label, color, id) => {
+    if (o.start == null || o.end == null || !S.dur) return;
+    const d = document.createElement('div');
+    d.className = 'seg ' + cls; d.dataset.id = id;
+    d.style.left = (o.start / S.dur * 100) + '%';
+    d.style.width = (Math.max(0, o.end - o.start) / S.dur * 100) + '%';
+    if (color) d.style.setProperty('--c', color);
+    d.innerHTML = `<div class="h l" data-part="l"></div><span class="n">${label}</span><div class="h r" data-part="r"></div>`;
+    layer.appendChild(d);
+  };
+  S.segs.forEach((sg, i) => block(sg, sg.id === S.sel ? 'sel' : '', i + 1, colorOf(sg), sg.id));
+  if (!editing) block(S.draft, 'draft', '새 구간', null, 'draft');
+  if (!editing && S.draft.start != null && S.draft.end == null && S.dur) {   // 시작만 찍었을 때 표시
+    const m = document.createElement('div');
+    m.className = 'seg draft'; m.style.left = (S.draft.start / S.dur * 100) + '%'; m.style.width = '0';
+    layer.appendChild(m);
+  }
+
+  // 목록
+  const list = $('list');
+  $('segCount').textContent = S.segs.length ? `(${S.segs.length}개 · 총 ${fmt(S.segs.reduce((a, x) => a + x.end - x.start, 0))})` : '';
+  list.innerHTML = S.segs.length ? '' : '<div class="empty">아직 구간이 없어요<br>시작·끝을 지정하고 Enter</div>';
+  S.segs.forEach((sg, i) => {
+    const row = document.createElement('div');
+    row.className = 'item' + (sg.id === S.sel ? ' sel' : '');
+    row.style.setProperty('--c', colorOf(sg));
+    row.innerHTML = `<span class="dot">${i + 1}</span>
+      <span class="tm">${fmt(sg.start)} → ${fmt(sg.end)}<small>${fmt(sg.end - sg.start)}</small></span>
+      <button data-a="play" title="이 구간 반복 재생">🔁</button>
+      <button data-a="up" title="위로" ${i === 0 ? 'disabled' : ''}>▲</button>
+      <button data-a="down" title="아래로" ${i === S.segs.length - 1 ? 'disabled' : ''}>▼</button>
+      <button data-a="del" title="삭제">✕</button>`;
+    row.onclick = e => {
+      const a = e.target.closest('button')?.dataset.a;
+      if (a === 'del') removeSeg(sg.id);
+      else if (a === 'up') moveSeg(sg.id, -1);
+      else if (a === 'down') moveSeg(sg.id, 1);
+      else if (a === 'play') { select(sg.id); setLoop(true); }
+      else select(sg.id === S.sel ? null : sg.id);
+    };
+    list.appendChild(row);
+  });
+  $('bUndo').disabled = !S.undo.length; $('bRedo').disabled = !S.redo.length;
+  $('bClear').disabled = !S.segs.length;
+  $('bExport').disabled = !S.segs.length || busy;
+  $('bLoop').classList.toggle('on', S.loop);
+}
+
+/* ---------- 재생 ---------- */
+function seek(t){ v.currentTime = clamp(t, 0, S.dur); }
+function togglePlay(){ v.paused ? v.play() : v.pause(); }
+function stepFrame(n){ v.pause(); seek(v.currentTime + n / S.fps); }
+function setLoop(on){
+  S.loop = on ?? !S.loop;
+  const t = target();
+  if (S.loop) {
+    if (!validRange(t)) { S.loop = false; toast('반복할 구간이 없어요'); }
+    else { if (v.currentTime < t.start || v.currentTime >= t.end) seek(t.start); v.play(); }
+  }
+  render();
+}
+v.addEventListener('play', () => $('bPlay').textContent = '⏸');
+v.addEventListener('pause', () => $('bPlay').textContent = '▶');
+v.addEventListener('click', togglePlay);
+$('bPlay').onclick = togglePlay;
+$('bBack1').onclick = () => seek(v.currentTime - 1);
+$('bFwd1').onclick = () => seek(v.currentTime + 1);
+$('bPrevF').onclick = () => stepFrame(-1);
+$('bNextF').onclick = () => stepFrame(1);
+$('bLoop').onclick = () => setLoop();
+$('bMute').onclick = () => { v.muted = !v.muted; $('bMute').textContent = v.muted ? '🔇' : '🔊'; };
+
+(function tick(){
+  if (S.dur) {
+    const t = v.currentTime;
+    $('ph').style.left = `calc(${t / S.dur * 100}% - 1px)`;
+    $('tNow').textContent = `${fmt(t, 2)} / ${fmt(S.dur)}`;
+    const tg = target();
+    if (S.loop && !v.paused && validRange(tg) && (t >= tg.end || t < tg.start - 0.5)) v.currentTime = tg.start;
+  }
+  requestAnimationFrame(tick);
+})();
+
+// 프레임레이트 추정 (재생 중 프레임 간격 측정)
+if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+  let last = null, best = Infinity;
+  const cb = (now, meta) => {
+    if (last != null && !v.paused) { const d = meta.mediaTime - last; if (d > 0.004 && d < 0.2 && d < best) { best = d; S.fps = Math.round(1 / d); } }
+    last = meta.mediaTime; v.requestVideoFrameCallback(cb);
+  };
+  v.requestVideoFrameCallback(cb);
+}
+
+/* ---------- 타임라인 조작 ---------- */
+const tl = $('tl');
+const xToTime = x => { const r = tl.getBoundingClientRect(); return clamp((x - r.left) / r.width, 0, 1) * S.dur; };
+let drag = null;
+tl.addEventListener('pointerdown', e => {
+  if (!S.dur) return;
+  const segEl = e.target.closest('.seg');
+  tl.setPointerCapture(e.pointerId);
+  if (!segEl || !segEl.dataset.id) { drag = {kind:'seek'}; seek(xToTime(e.clientX)); return; }
+  const id = segEl.dataset.id === 'draft' ? 'draft' : +segEl.dataset.id;
+  const o = id === 'draft' ? S.draft : S.segs.find(x => x.id === id);
+  drag = {kind:'seg', id, o, part:e.target.dataset.part || 'body', x0:e.clientX, s0:o.start, e0:o.end, moved:false};
+});
+tl.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (drag.kind === 'seek') return seek(xToTime(e.clientX));
+  const w = tl.getBoundingClientRect().width;
+  const dt = (e.clientX - drag.x0) / w * S.dur;
+  if (!drag.moved && Math.abs(e.clientX - drag.x0) < 3) return;
+  if (!drag.moved) { drag.moved = true; if (drag.id !== 'draft') pushUndo(); }
+  const o = drag.o, len = drag.e0 - drag.s0;
+  if (drag.part === 'l') { o.start = r3(clamp(drag.s0 + dt, 0, o.end - MIN_LEN)); seek(o.start); }
+  else if (drag.part === 'r') { o.end = r3(clamp(drag.e0 + dt, o.start + MIN_LEN, S.dur)); seek(o.end); }
+  else { o.start = r3(clamp(drag.s0 + dt, 0, S.dur - len)); o.end = r3(o.start + len); seek(o.start); }
+  render();
+});
+const endDrag = () => {
+  if (drag && drag.kind === 'seg' && !drag.moved && drag.id !== 'draft') select(drag.id);
+  drag = null;
+};
+tl.addEventListener('pointerup', endDrag);
+tl.addEventListener('pointercancel', endDrag);
+
+function renderRuler(){
+  const n = 8; let h = '';
+  for (let i = 0; i <= n; i++) h += `<span style="left:${i / n * 100}%">${fmt(S.dur * i / n, 0)}</span>`;
+  $('ruler').innerHTML = h;
+}
+
+/* ---------- 썸네일 ---------- */
+let thumbJob = 0;
+async function makeThumbs(){
+  const job = ++thumbJob, cv = $('thumbs');
+  const N = 20, H = 64, W = Math.round(H * (v.videoWidth / v.videoHeight || 16 / 9));
+  cv.width = N * W; cv.height = H;
+  const ctx = cv.getContext('2d'); ctx.clearRect(0, 0, cv.width, cv.height);
+  const tv = document.createElement('video');
+  tv.muted = true; tv.preload = 'auto'; tv.src = S.url;
+  await new Promise((ok, no) => { tv.onloadeddata = ok; tv.onerror = no; }).catch(() => null);
+  for (let i = 0; i < N && job === thumbJob; i++) {
+    await new Promise(ok => { tv.onseeked = ok; tv.currentTime = (i + 0.5) * S.dur / N; setTimeout(ok, 1500); });
+    try { ctx.drawImage(tv, i * W, 0, W, H); } catch {}
+  }
+  tv.removeAttribute('src'); tv.load();
+}
+
+/* ---------- 파일 열기 ---------- */
+const drop = $('drop'), fi = $('fileInput');
+drop.onclick = () => fi.click();
+$('bOpen').onclick = () => fi.click();
+fi.onchange = () => fi.files[0] && openFile(fi.files[0]);
+['dragover','dragenter'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+document.addEventListener('drop', e => { const f = e.dataTransfer?.files?.[0]; if (f) openFile(f); });
+
+function openFile(file){
+  if (busy) return toast('내보내는 중에는 파일을 바꿀 수 없어요');
+  if (S.file && S.segs.length && !confirm('다른 파일을 열면 현재 구간 목록이 지워져요. 계속할까요?')) return;
+  if (S.url) URL.revokeObjectURL(S.url);
+  Object.assign(S, {file, url:URL.createObjectURL(file), dur:0, segs:[], nextId:1, sel:null, draft:{start:null,end:null}, loop:false, undo:[], redo:[], fps:30});
+  inputReady = false;
+  $('fileName').textContent = `${file.name} · ${(file.size / 1048576).toFixed(1)}MB`;
+  v.src = S.url;
+  v.onloadedmetadata = () => {
+    S.dur = v.duration;
+    drop.classList.add('hidden'); $('main').classList.remove('hidden');
+    renderRuler(); render(); makeThumbs();
+    if (file.size > 1024 ** 3) toast('1GB가 넘는 파일은 브라우저 메모리가 부족할 수 있어요', 4000);
+    loadEngine().catch(() => {});                                           // 미리 엔진 준비
+  };
+  v.onerror = () => toast('이 브라우저에서 재생할 수 없는 형식이에요 (코덱 미지원)', 4000);
+  fi.value = '';
+}
+
+/* ---------- 일괄 입력 ---------- */
+function parseLine(line){
+  line = line.replace(/까지/g, '').trim();
+  let m = line.match(/^(.+?)\s*\+\s*(.+)$/);                                // 시작 +길이
+  if (m) { const s = parseTime(m[1]), l = parseTime(m[2]); return s != null && l != null ? [s, s + l] : null; }
+  m = line.match(/^(.+?)\s*(?:~|–|—|-|부터|에서)\s*(.+)$/);
+  if (m) { const s = parseTime(m[1]), e = parseTime(m[2]); return s != null && e != null ? [s, e] : null; }
+  return null;
+}
+$('bBulk').onclick = () => {
+  const lines = $('bulk').value.split('\n');
+  const add = [], errs = [];
+  lines.forEach((ln, i) => {
+    if (!ln.trim() || ln.trim().startsWith('#')) return;
+    const r = parseLine(ln);
+    if (!r) errs.push(`${i + 1}번째 줄: 해석할 수 없어요 — "${ln.trim()}"`);
+    else if (r[1] - r[0] < MIN_LEN) errs.push(`${i + 1}번째 줄: 끝이 시작보다 뒤여야 해요`);
+    else if (r[0] >= S.dur) errs.push(`${i + 1}번째 줄: 시작이 영상 길이(${fmt(S.dur)})를 넘어요`);
+    else add.push([r3(r[0]), r3(Math.min(r[1], S.dur))]);
+  });
+  const msg = $('bulkMsg');
+  if (add.length) {
+    pushUndo();
+    add.forEach(([s, e]) => S.segs.push({id:S.nextId++, start:s, end:e}));
+    render();
+  }
+  msg.className = 'msg ' + (errs.length ? 'err' : 'ok');
+  msg.textContent = (add.length ? `${add.length}개 구간을 등록했어요` : '등록된 구간이 없어요') + (errs.length ? '\n' + errs.join('\n') : '');
+};
+$('bToText').onclick = () => {
+  $('bulk').value = S.segs.map(x => `${fmtKo(x.start)} - ${fmtKo(x.end)}`).join('\n');
+  $('bulkMsg').className = 'msg ok'; $('bulkMsg').textContent = '현재 목록을 텍스트로 옮겼어요. 복사해 두면 나중에 다시 등록할 수 있어요.';
+};
+$('bCopy').onclick = async () => { try { await navigator.clipboard.writeText($('bulk').value); toast('복사했어요'); } catch { $('bulk').select(); toast('Ctrl+C로 복사해 주세요'); } };
+
+/* ---------- 버튼 ---------- */
+$('bSetS').onclick = () => setTargetTimes(v.currentTime, undefined);
+$('bSetE').onclick = () => setTargetTimes(undefined, v.currentTime);
+$('bAdd').onclick = addDraft;
+$('bDesel').onclick = () => select(null);
+$('bUndo').onclick = undo; $('bRedo').onclick = redo;
+$('bClear').onclick = () => { if (!S.segs.length) return; pushUndo(); S.segs = []; S.sel = null; render(); toast('전체 삭제 — Ctrl+Z로 되돌릴 수 있어요'); };
+
+/* ---------- 단축키 ---------- */
+document.addEventListener('keydown', e => {
+  if (!S.dur) return;
+  const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName) && document.activeElement.type !== 'radio';
+  const k = e.key, ctrl = e.ctrlKey || e.metaKey;
+  if (ctrl && !typing && k.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (ctrl && !typing && k.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
+  if (typing || ctrl || e.altKey) return;
+  const map = {
+    ' ': togglePlay,
+    'ArrowLeft': () => seek(v.currentTime - (e.shiftKey ? 5 : 1)),
+    'ArrowRight': () => seek(v.currentTime + (e.shiftKey ? 5 : 1)),
+    ',': () => stepFrame(-1), '.': () => stepFrame(1),
+    'i': () => setTargetTimes(v.currentTime, undefined),
+    'o': () => setTargetTimes(undefined, v.currentTime),
+    'Enter': () => S.sel == null ? addDraft() : select(null),
+    'l': () => setLoop(), 'm': () => $('bMute').click(),
+    'Escape': () => { if (S.sel != null) select(null); else if (S.loop) setLoop(false); },
+    'Delete': () => S.sel != null && removeSeg(S.sel),
+    'Backspace': () => S.sel != null && removeSeg(S.sel),
+  };
+  const fn = map[k.length === 1 ? k.toLowerCase() : k] || map[k];
+  if (fn) { e.preventDefault(); if (document.activeElement?.tagName === 'BUTTON') document.activeElement.blur(); fn(); }
+});
+
+/* ---------- 내보내기 (ffmpeg.wasm) ---------- */
+const CORE = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';   // 워커가 module 타입이라 ESM 코어 사용
+const WORKER = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js';
+let ff = null, enginePromise = null, inputReady = false, busy = false, cancelled = false, logTail = [];
+let progCb = null;
+
+function setEngine(text, cls){ const el = $('engine'); el.textContent = '엔진: ' + text; el.className = 'pill ' + (cls || ''); }
+async function blobURL(url, type, onProg){
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('다운로드 실패: ' + url);
+  const total = +res.headers.get('content-length') || 0;
+  const reader = res.body.getReader(); const chunks = []; let got = 0;
+  for (;;) { const {done, value} = await reader.read(); if (done) break; chunks.push(value); got += value.length; onProg?.(got, total); }
+  return URL.createObjectURL(new Blob(chunks, {type}));
+}
+function loadEngine(){
+  if (enginePromise) return enginePromise;
+  enginePromise = (async () => {
+    setEngine('불러오는 중…', 'busy');
+    const f = new FFmpegWASM.FFmpeg();
+    f.on('log', ({message}) => { logTail.push(message); if (logTail.length > 30) logTail.shift(); });
+    f.on('progress', ({progress}) => progCb?.(clamp(progress, 0, 1)));
+    const [w, c, m] = await Promise.all([
+      blobURL(WORKER, 'text/javascript'),
+      blobURL(CORE + '/ffmpeg-core.js', 'text/javascript'),
+      blobURL(CORE + '/ffmpeg-core.wasm', 'application/wasm', (g, t) => setEngine(`내려받는 중 ${(g / 1048576).toFixed(0)}${t ? '/' + (t / 1048576).toFixed(0) : ''}MB`, 'busy')),
+    ]);
+    await f.load({classWorkerURL:w, coreURL:c, wasmURL:m});
+    ff = f; setEngine('준비됨', 'ok');
+    return f;
+  })().catch(err => { enginePromise = null; setEngine('불러오기 실패', 'err'); throw err; });
+  return enginePromise;
+}
+const extOf = name => (name.match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase();
+const baseOf = name => name.replace(/\.[^.]+$/, '');
+let inName = '';
+async function ensureInput(){
+  if (inputReady) return;
+  status('영상을 엔진에 올리는 중…');
+  try { if (inName) await ff.deleteFile(inName); } catch {}
+  inName = 'input.' + extOf(S.file.name);
+  await ff.writeFile(inName, new Uint8Array(await S.file.arrayBuffer()));
+  inputReady = true;
+}
+async function run(args){
+  logTail = [];
+  const code = await ff.exec(args);
+  if (cancelled) throw new Error('cancel');
+  if (code !== 0) throw new Error('ffmpeg 오류\n' + logTail.slice(-6).join('\n'));
+}
+function cutArgs(seg, out, exact){
+  const ss = String(seg.start), t = String(r3(seg.end - seg.start));
+  const common = ['-ss', ss, '-i', inName, '-t', t, '-map', '0:v:0?', '-map', '0:a:0?'];
+  return exact
+    ? [...common, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', out]
+    : [...common, '-c', 'copy', '-avoid_negative_ts', 'make_zero', out];
+}
+function download(data, name){
+  const url = URL.createObjectURL(new Blob([data.buffer], {type:'video/*'}));
+  const a = Object.assign(document.createElement('a'), {href:url, download:name});
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+const status = t => $('expStatus').textContent = t;
+const bar = p => $('bar').style.width = (p * 100).toFixed(1) + '%';
+
+$('bExport').onclick = async () => {
+  if (!S.segs.length || busy) return;
+  const merge = document.querySelector('[name=out]:checked').value === 'merge';
+  const exact = document.querySelector('[name=mode]:checked').value === 'exact';
+  const ext = exact ? 'mp4' : extOf(S.file.name), base = baseOf(S.file.name);
+  const segs = S.segs.slice(), total = segs.length + (merge ? 0.3 : 0);
+  busy = true; cancelled = false; render();
+  $('bCancel').classList.remove('hidden'); bar(0);
+  const t0 = performance.now();
+  try {
+    status('엔진 준비 중… (처음 한 번 약 30MB를 내려받아요)');
+    await loadEngine();
+    await ensureInput();
+    const parts = [];
+    for (let i = 0; i < segs.length; i++) {
+      const sg = segs[i], out = `part${i}.${ext}`;
+      status(`구간 ${i + 1}/${segs.length} 자르는 중 (${fmt(sg.start)} → ${fmt(sg.end)})${exact ? ' · 재인코딩' : ''}`);
+      progCb = p => bar((i + p) / total);
+      await run(cutArgs(sg, out, exact));
+      if (merge) parts.push(out);
+      else {
+        download(await ff.readFile(out), `${base}_${fileStamp(sg.start)}-${fileStamp(sg.end)}.${ext}`);
+        await ff.deleteFile(out);
+        await new Promise(r => setTimeout(r, 400));                          // 연속 다운로드 간격
+      }
+      bar((i + 1) / total);
+    }
+    if (merge) {
+      status('구간을 하나로 합치는 중…');
+      await ff.writeFile('list.txt', new TextEncoder().encode(parts.map(p => `file '${p}'`).join('\n')));
+      progCb = null;
+      const out = `merged.${ext}`;
+      await run(['-f', 'concat', '-safe', '0', '-i', 'list.txt', '-c', 'copy', ...(ext === 'mp4' || ext === 'mov' ? ['-movflags', '+faststart'] : []), out]);
+      download(await ff.readFile(out), `${base}_합본_${segs.length}구간.${ext}`);
+      for (const p of [...parts, 'list.txt', out]) { try { await ff.deleteFile(p); } catch {} }
+    }
+    bar(1);
+    status(`완료! ${merge ? '파일 1개' : `파일 ${segs.length}개`} 저장 · ${((performance.now() - t0) / 1000).toFixed(1)}초 걸림` +
+      (!merge && segs.length > 1 ? '\n※ 브라우저가 "여러 파일 다운로드"를 물으면 허용해 주세요' : ''));
+    toast('내보내기 완료');
+  } catch (err) {
+    if (err.message === 'cancel' || cancelled) { status('취소했어요'); bar(0); }
+    else { console.error(err); status('실패했어요: ' + (err.message || err) + (exact ? '' : '\n→ "정확하게" 모드로 다시 시도해 보세요')); }
+  } finally {
+    busy = false; progCb = null; $('bCancel').classList.add('hidden'); render();
+  }
+};
+$('bCancel').onclick = () => {
+  cancelled = true;
+  try { ff?.terminate(); } catch {}
+  ff = null; enginePromise = null; inputReady = false; setEngine('대기');
+};
+
+/* ---------- 토스트 ---------- */
+let toastT;
+function toast(msg, ms = 1600){ const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), ms); }
+
+window.app = {S, openFile, parseTime, parseLine};                            // 디버깅용
+</script>
+</body>
+</html>
