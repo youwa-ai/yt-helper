@@ -112,6 +112,11 @@ textarea{width:100%;min-height:150px;resize:vertical;font-variant-numeric:tabula
     <span id="fileName" class="file"></span>
   </header>
 
+  <div id="fileWarn" class="note hidden" style="margin:0 0 12px">
+    ⚠ 파일을 더블클릭해서 열면 브라우저 보안 때문에 <b>자르기(내보내기)가 되지 않아요.</b> 미리보기와 구간 지정만 돼요.<br>
+    이 주소로 열어 주세요 → <a href="https://youwa-ai.github.io/yt-helper/video-cutter.html" style="color:inherit">https://youwa-ai.github.io/yt-helper/video-cutter.html</a>
+  </div>
+
   <!-- ① 불러오기 -->
   <div id="drop">
     <b>영상 파일을 여기에 끌어다 놓으세요</b>
@@ -657,9 +662,13 @@ async function blobURL(url, type, onProg){
   for (;;) { const {done, value} = await reader.read(); if (done) break; chunks.push(value); got += value.length; onProg?.(got, total); }
   return URL.createObjectURL(new Blob(chunks, {type}));
 }
+// file:// 로 열면 워커를 띄울 수 없어 엔진이 영원히 대기함
+const LOCAL_FILE = location.protocol === 'file:' || location.origin === 'null';
+if (LOCAL_FILE) { $('fileWarn').classList.remove('hidden'); setEngine('사용 불가', 'err'); }
 function loadEngine(){
   if (enginePromise) return enginePromise;
   enginePromise = (async () => {
+    if (LOCAL_FILE) throw new Error('파일을 더블클릭해서 연 상태라 엔진을 쓸 수 없어요. 위 안내의 주소로 열어 주세요');
     setEngine('불러오는 중…', 'busy');
     const f = new FFmpegWASM.FFmpeg();
     f.on('log', ({message}) => { logTail.push(message); if (logTail.length > 30) logTail.shift(); });
@@ -667,10 +676,16 @@ function loadEngine(){
     engineURLs ??= await Promise.all([
       blobURL(WORKER, 'text/javascript'),
       blobURL(CORE + '/ffmpeg-core.js', 'text/javascript'),
-      blobURL(CORE + '/ffmpeg-core.wasm', 'application/wasm', (g, t) => setEngine(`내려받는 중 ${(g / 1048576).toFixed(0)}${t ? '/' + (t / 1048576).toFixed(0) : ''}MB`, 'busy')),
+      // content-length는 압축된 크기일 수 있어서, 받은 양이 더 크면 전체 크기는 표시하지 않음
+      blobURL(CORE + '/ffmpeg-core.wasm', 'application/wasm', (g, t) => setEngine(`내려받는 중 ${(g / 1048576).toFixed(0)}${t && g <= t ? '/' + (t / 1048576).toFixed(0) : ''}MB`, 'busy')),
     ]);
     const [w, c, m] = engineURLs;
-    await f.load({classWorkerURL:w, coreURL:c, wasmURL:m});
+    setEngine('시작하는 중…', 'busy');
+    let timer;
+    const timeout = new Promise((_, no) => timer = setTimeout(() => no(new Error('엔진이 30초 안에 시작되지 않았어요. 새로고침 후 다시 시도해 주세요')), 30000));
+    try { await Promise.race([f.load({classWorkerURL:w, coreURL:c, wasmURL:m}), timeout]); }
+    catch (err) { try { f.terminate(); } catch {} throw err; }
+    finally { clearTimeout(timer); }
     ff = f; setEngine('준비됨', 'ok');
     return f;
   })().catch(err => { enginePromise = null; setEngine('불러오기 실패', 'err'); throw err; });
@@ -681,7 +696,8 @@ const baseOf = name => name.replace(/\.[^.]+$/, '');
 // 한 번 오류가 난 엔진은 메모리가 망가져 있으므로 버리고 새로 띄운다
 function resetEngine(){
   try { ff?.terminate(); } catch {}
-  ff = null; enginePromise = null; inputReady = false; setEngine('대기');
+  ff = null; enginePromise = null; inputReady = false;
+  LOCAL_FILE ? setEngine('사용 불가', 'err') : setEngine('대기');
 }
 let inName = '';
 async function ensureInput(){
